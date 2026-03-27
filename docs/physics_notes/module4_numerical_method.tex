@@ -1,0 +1,217 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[table]{xcolor}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{booktabs,array,longtable,tabularx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\usepackage{physics}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+
+\definecolor{TitleBlue}{HTML}{163A5F}
+\definecolor{AccentTeal}{HTML}{2D6F73}
+\definecolor{SoftBlue}{HTML}{EAF3F8}
+\definecolor{SoftTeal}{HTML}{EDF8F6}
+\definecolor{SoftGray}{HTML}{F5F7FA}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{PINN for Two-Dimensional MHD Evolution}
+\rhead{Module 4 Physics Notes}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+\titleformat{\section}{\Large\bfseries\color{TitleBlue}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{TitleBlue}}{\thesubsubsection}{0.6em}{}
+
+\newtcolorbox{overviewbox}{colback=SoftBlue,colframe=TitleBlue,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newtcolorbox{physicsbox}{colback=SoftTeal,colframe=AccentTeal,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \bfseries \color{TitleBlue} Module 4 Physics Notes: Numerical Method for the Conventional MHD Solver}\\[0.5em]
+    {\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}\\[0.8em]
+    {\normalsize Purpose: explain the numerical method used before the PINN stage and connect each solver ingredient to the underlying physics.}
+\end{center}
+
+\vspace{0.5em}
+
+\begin{overviewbox}
+\textbf{Scope of this note.} This note explains the conventional solver that the project builds before the physics-informed neural network. The solver is a two-dimensional finite-volume method for ideal magnetohydrodynamics using a uniform Cartesian grid, Rusanov interface fluxes, Runge-Kutta time stepping, periodic boundaries for the verification case, and a piecewise-linear reconstruction with a minmod limiter. Every symbol introduced is defined in the table below.
+\end{overviewbox}
+
+\section{Symbol and variable table}
+\rowcolors{2}{SoftGray}{white}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.19\textwidth} >{\raggedright\arraybackslash}p{0.27\textwidth} >{\raggedright\arraybackslash}p{0.46\textwidth}}
+\toprule
+\textbf{Symbol} & \textbf{Name} & \textbf{Meaning} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Symbol} & \textbf{Name} & \textbf{Meaning} \\
+\midrule
+\endhead
+$N_x,N_y$ & grid cell counts & Number of finite-volume cells in the $x$ and $y$ directions. \\
+$\Delta x,\Delta y$ & cell widths & Uniform cell spacing in the $x$ and $y$ directions. \\
+$\Delta t$ & time step & Explicit update step chosen from a CFL stability bound. \\
+$\mathbf{U}_{i,j}$ & cell-averaged conserved state & Conserved state stored in cell $(i,j)$. \\
+$\mathbf{F}_{i+1/2,j}$ & x-face numerical flux & Numerical flux through the right face of cell $(i,j)$. \\
+$\mathbf{G}_{i,j+1/2}$ & y-face numerical flux & Numerical flux through the top face of cell $(i,j)$. \\
+$a_{\max}$ & maximum signal speed & Estimated largest wave speed crossing a face. \\
+$c_{f,x},c_{f,y}$ & fast magnetosonic speeds & Fastest MHD characteristic speeds normal to the $x$ or $y$ direction. \\
+$\text{CFL}$ & Courant number & Safety factor that controls the explicit time step. \\
+$\mathbf{U}_L,\mathbf{U}_R$ & left and right interface states & Reconstructed states on the two sides of an interface. \\
+$\phi(r)$ & limiter idea & Nonlinear mechanism that reduces oscillatory slopes near sharp gradients. \\
+$\operatorname{minmod}$ & minmod limiter & Chooses a conservative slope with reduced overshoot risk. \\
+$\nabla\cdot\mathbf{B}$ & magnetic divergence & Diagnostic measuring the extent to which the discrete magnetic field violates the divergence-free condition. \\
+\bottomrule
+\end{longtable}
+
+\section{Why the project starts with a conventional solver}
+A central design choice in this project is that the neural network does not come first. The conventional solver comes first. That choice is scientific, not cosmetic. Before a physics-informed neural network can be judged honestly, there must be a trustworthy numerical reference that solves the intended governing equations directly. The conventional solver establishes what the equations predict, what diagnostics matter, and what numerical errors look like.
+
+\begin{physicsbox}
+\textbf{Physical and scientific reason.} A PINN can only be convincing if it is compared against a baseline that already encodes the target physics faithfully. Otherwise the neural network is floating without an anchor.
+\end{physicsbox}
+
+\section{Finite-volume viewpoint}
+The finite-volume method evolves \emph{cell averages} rather than point values. For a conservation law,
+\begin{equation}
+\pdv{\mathbf{U}}{t} + \pdv{\mathbf{F}}{x} + \pdv{\mathbf{G}}{y} = 0,
+\end{equation}
+integrating over a cell and applying the divergence theorem gives
+\begin{equation}
+\dv{}{t}\left(\overline{\mathbf{U}}_{i,j}\right)
+=
+-\frac{\mathbf{F}_{i+1/2,j}-\mathbf{F}_{i-1/2,j}}{\Delta x}
+-\frac{\mathbf{G}_{i,j+1/2}-\mathbf{G}_{i,j-1/2}}{\Delta y}.
+\label{eq:fv-balance}
+\end{equation}
+Equation \eqref{eq:fv-balance} is the mathematical statement that the amount of a conserved quantity inside a cell changes only because flux crosses the cell boundary.
+
+\subsection{Why this form is physically natural}
+For mass, momentum, and total energy, the finite-volume form matches how one would do bookkeeping in a control volume. If more mass flows out of the right face than enters through the left face, the cell loses mass. The same logic applies to momentum and energy.
+
+\section{Rusanov numerical flux}
+At a cell face, the left and right cells supply different states. A numerical flux is therefore needed. The project begins with the Rusanov flux,
+\begin{equation}
+\mathbf{F}^{\mathrm{num}} = \frac{1}{2}\left[\mathbf{F}(\mathbf{U}_L)+\mathbf{F}(\mathbf{U}_R)\right]
+- \frac{1}{2} a_{\max}(\mathbf{U}_R-\mathbf{U}_L).
+\label{eq:rusanov}
+\end{equation}
+The same structure is used in the $y$ direction with $\mathbf{G}$.
+
+The first term in \eqref{eq:rusanov} averages the physical fluxes from the two sides. The second term is dissipative. It damps interface jumps in proportion to the maximum signal speed. That is why Rusanov is robust and easy to implement, even though it is more diffusive than more sophisticated MHD solvers.
+
+\subsection{Why signal speed matters}
+The parameter $a_{\max}$ must be large enough to cover the fastest information that can cross the interface. In MHD the safe choice is to use the fast magnetosonic speed. For propagation normal to the $x$ direction,
+\begin{equation}
+ c_{f,x}^2 = \frac{1}{2}\left[a^2+b^2 + \sqrt{(a^2+b^2)^2-4a^2 b_x^2}\right],
+\end{equation}
+where
+\begin{equation}
+ a^2 = \frac{\gamma p}{\rho}, \qquad b^2 = \frac{B_x^2+B_y^2+B_z^2}{\rho}, \qquad b_x^2 = \frac{B_x^2}{\rho}.
+\end{equation}
+Then
+\begin{equation}
+ a_{\max,x} = |u_x| + c_{f,x}.
+\end{equation}
+The same logic gives $a_{\max,y}=|u_y|+c_{f,y}$.
+
+\begin{physicsbox}
+\textbf{Interpretation.} The fluid can carry information by advection, by ordinary compression waves, and by magnetic restoring forces. The fast magnetosonic speed is a practical upper envelope for all of them.
+\end{physicsbox}
+
+\section{Why piecewise-linear reconstruction is added}
+A first-order finite-volume method treats each cell as piecewise constant. That is robust, but it smears waves strongly. Since the first benchmark is an Alfv\'en wave, excessive smearing is unacceptable. The project therefore upgrades to a piecewise-linear method.
+
+Within each cell, a slope is estimated and used to reconstruct left and right interface states. A generic one-dimensional idea is
+\begin{equation}
+ U_{i}^{L} = U_i - \frac{1}{2}\sigma_i, \qquad
+ U_{i}^{R} = U_i + \frac{1}{2}\sigma_i,
+\end{equation}
+where $\sigma_i$ is a limited slope.
+
+\subsection{Why a limiter is needed}
+A naive centered slope can create nonphysical oscillations near steep gradients. The minmod limiter chooses the smallest-magnitude slope consistent with the local one-sided differences. For two candidate slopes $a$ and $b$,
+\begin{equation}
+\operatorname{minmod}(a,b) =
+\begin{cases}
+\operatorname{sign}(a)\min(|a|,|b|), & ab>0,\\
+0, & ab\le 0.
+\end{cases}
+\end{equation}
+If the local data suggest a smooth monotone trend, the slope is retained in a conservative way. If the data suggest a change in sign, the limiter suppresses the slope and reverts toward first order.
+
+\section{Runge-Kutta time stepping}
+The project upgrades from forward Euler to a two-stage Runge-Kutta method. In one common form,
+\begin{align}
+\mathbf{U}^{(1)} &= \mathbf{U}^n + \Delta t\,\mathcal{L}(\mathbf{U}^n),\\
+\mathbf{U}^{n+1} &= \frac{1}{2}\mathbf{U}^n + \frac{1}{2}\left[\mathbf{U}^{(1)} + \Delta t\,\mathcal{L}(\mathbf{U}^{(1)})\right],
+\end{align}
+where $\mathcal{L}(\mathbf{U})$ is the spatial finite-volume operator from the flux differences.
+
+The point is not that Runge-Kutta is fancy. The point is that it reduces temporal truncation error enough that the wave verification becomes much more meaningful.
+
+\section{CFL time-step condition}
+Because the solver is explicit, the time step must respect a stability condition:
+\begin{equation}
+\Delta t = \text{CFL}\cdot \min\left(\frac{\Delta x}{\max a_{\max,x}},\frac{\Delta y}{\max a_{\max,y}}\right).
+\end{equation}
+If $\Delta t$ is too large, the numerical method tries to move information farther than the grid can represent in one update, and the explicit scheme becomes unstable.
+
+\section{Periodic boundaries and why they are useful first}
+The first verification case uses periodic boundaries. This makes the Alfv\'en-wave benchmark especially clean because the wave exits one side of the domain and re-enters on the opposite side without any artificial reflection. Numerically, periodicity is enforced with ghost cells that copy data from the opposite boundary.
+
+\section{Divergence of the magnetic field as a diagnostic}
+The exact MHD equations require
+\begin{equation}
+\nabla\cdot\mathbf{B}=0.
+\end{equation}
+In two dimensions,
+\begin{equation}
+\nabla\cdot\mathbf{B}=\pdv{B_x}{x}+\pdv{B_y}{y}.
+\end{equation}
+The current solver monitors this quantity as a diagnostic rather than eliminating it with a more advanced scheme such as constrained transport. That is an honest design choice for an interview project: monitor the error first, then decide whether a more elaborate divergence-control method is justified.
+
+\section{Positivity floors}
+The code also includes optional floors on density and pressure. Physically, negative density or negative pressure is unacceptable. Numerically, such states can appear when a method is pushed too hard near steep gradients or under-resolved features. The positivity floor is therefore a pragmatic safeguard. It is not the ideal long-term cure, but it is a legitimate and transparent one during solver development.
+
+\section{How the solver pieces fit together}
+One time step of the upgraded solver can be summarized as follows:
+\begin{enumerate}[leftmargin=1.8em]
+    \item start from cell-averaged conserved variables,
+    \item convert to primitive variables where needed,
+    \item reconstruct piecewise-linear interface states,
+    \item compute Rusanov numerical fluxes,
+    \item assemble the finite-volume spatial operator,
+    \item advance in time with Runge-Kutta 2,
+    \item optionally apply positivity floors,
+    \item evaluate diagnostics such as $L^2$ error and $\max|\nabla\cdot\mathbf{B}|$.
+\end{enumerate}
+
+\section{Why this is a strong interview-level method}
+This solver is not the most advanced MHD solver possible, but it is strong for an interview project because every ingredient has a clear purpose:
+\begin{itemize}[leftmargin=1.8em]
+    \item finite volume respects conservation,
+    \item Rusanov flux is robust and explainable,
+    \item Runge-Kutta 2 improves time accuracy,
+    \item piecewise-linear reconstruction improves wave resolution,
+    \item divergence monitoring shows physical honesty,
+    \item verification against an Alfv\'en wave shows that the solver is not just producing pictures.
+\end{itemize}
+
+\begin{overviewbox}
+\textbf{Bottom line.} The conventional solver is the scientific backbone of the project. It is the reference against which the PINN is judged. Its structure is intentionally clean, conservative, and explainable.
+\end{overviewbox}
+
+\end{document}

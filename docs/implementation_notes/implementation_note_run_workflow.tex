@@ -1,0 +1,210 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[table]{xcolor}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs,array,longtable,tabularx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+
+\definecolor{TitleBlue}{HTML}{163A5F}
+\definecolor{AccentTeal}{HTML}{2D6F73}
+\definecolor{SoftBlue}{HTML}{EAF3F8}
+\definecolor{SoftTeal}{HTML}{EDF8F6}
+\definecolor{SoftGray}{HTML}{F5F7FA}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{PINN for Two-Dimensional MHD Evolution}
+\rhead{Implementation Note}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+\titleformat{\section}{\Large\bfseries\color{TitleBlue}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
+
+\newtcolorbox{overviewbox}{colback=SoftBlue,colframe=TitleBlue,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newtcolorbox{implbox}{colback=SoftTeal,colframe=AccentTeal,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \bfseries \color{TitleBlue} Implementation Note: Run Workflow and Execution Order}\\[0.5em]
+    {\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}
+\end{center}
+
+\vspace{0.5em}
+
+\begin{overviewbox}
+\textbf{Purpose.} This note explains how to run the repository, in what order to run the scripts, what each major command is intended to prove, and where the outputs go. It is the operational companion to the physics notes and solver-architecture note.
+\end{overviewbox}
+
+\section{Recommended first-time run order}
+The repository should be run in stages rather than all at once. The correct logic is:
+\begin{enumerate}[leftmargin=1.8em]
+    \item verify low-level helper functions,
+    \item verify that a uniform state is preserved exactly,
+    \item verify Alfv\'en-wave propagation,
+    \item run the nonlinear magnetic-pressure-pulse demonstration,
+    \item only then run the physics-informed neural network (PINN) benchmark.
+\end{enumerate}
+
+\begin{implbox}
+\textbf{Why this order matters.} A conventional solver that is not yet trusted should not be used as the reference for a PINN comparison. The conventional finite-volume solver must be structurally correct before the machine-learning side is taken seriously.
+\end{implbox}
+
+\section{One-time MATLAB setup}
+From the project root, first add all subfolders to the MATLAB path:
+\begin{center}
+\texttt{addpath(genpath(pwd))}
+\end{center}
+This allows the case scripts, tests, helper functions, diagnostics, and plotting routines to find one another without manual path edits.
+
+\section{Stage A: core helper-function tests}
+Run the following tests first:
+\begin{center}
+\begin{tabular}{p{0.42\linewidth} p{0.48\linewidth}}
+\toprule
+\textbf{Command} & \textbf{Purpose} \\
+\midrule
+\texttt{test\_variable\_conversion} & checks primitive-to-conserved and conserved-to-primitive consistency \\
+\texttt{test\_flux\_functions} & checks the ideal-MHD physical flux routines \\
+\texttt{test\_time\_step\_and\_wave\_speeds} & checks grid generation, fast magnetosonic speeds, and the Courant-Friedrichs-Lewy time-step estimate \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+These are not full solver tests. They are low-level consistency checks. If one of these fails, the conventional solver should not be run yet.
+
+\section{Stage B: preservation tests for the finite-volume update}
+After the helper tests pass, run:
+\begin{center}
+\begin{tabular}{p{0.42\linewidth} p{0.48\linewidth}}
+\toprule
+\textbf{Command} & \textbf{Purpose} \\
+\midrule
+\texttt{test\_uniform\_state\_preservation} & checks the first-order Rusanov plus forward-Euler update \\
+\texttt{test\_rk2\_uniform\_state\_preservation} & checks the second-order Runge-Kutta update \\
+\texttt{test\_plm\_uniform\_state\_preservation} & checks the piecewise-linear reconstruction plus limiter path \\
+\texttt{test\_positivity\_floor\_application} & checks the optional density and pressure floor logic \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A spatially uniform state should remain uniform because every interface sees identical left and right states, so the net flux divergence should be zero. These tests are strong indicators that the indexing, ghost-cell handling, and flux-difference signs are consistent.
+
+\section{Stage C: Alfv\'en-wave verification}
+Once the tests above pass, run:
+\begin{center}
+\texttt{results = alfven\_wave\_case();}
+\end{center}
+This case is the first real verification run. It should be interpreted as the first quantitative test of the conventional solver, not just as a demonstration plot.
+
+\subsection{What this case should produce}
+The Alfv\'en-wave case should produce:
+\begin{itemize}[leftmargin=1.8em]
+    \item a measured Alfv\'en phase speed,
+    \item line-cut comparisons between numerical and exact $u_z$ and $B_z$,
+    \item time-step history,
+    \item error history,
+    \item summary text output,
+    \item magnetic-divergence diagnostics.
+\end{itemize}
+
+\subsection{What to inspect}
+The most important outputs to inspect are:
+\begin{enumerate}[leftmargin=1.8em]
+    \item expected versus measured Alfv\'en speed,
+    \item final $L^2$ error in $u_z$ and $B_z$,
+    \item whether the wave shape remains smooth,
+    \item whether $\max |\nabla \cdot \mathbf{B}|$ remains acceptably small.
+\end{enumerate}
+
+\section{Stage D: convergence study}
+After the single-case verification run, execute:
+\begin{center}
+\texttt{conv = alfven\_wave\_convergence\_study();}
+\end{center}
+This is the next credibility step. A convergence study is more persuasive than a single successful run because it tests whether the error decreases systematically as the grid is refined.
+
+\begin{implbox}
+\textbf{Interview value.} A convergence study shows that the solver is not just producing plausible pictures. It shows that the numerical solution behaves like a controlled approximation method.
+\end{implbox}
+
+\section{Stage E: nonlinear demonstration case}
+Once the solver is trusted on the verification benchmark, run:
+\begin{center}
+\texttt{pulse = magnetic\_pressure\_pulse\_case();}
+\end{center}
+This case is not primarily for analytic error comparison. Its role is to demonstrate nonlinear magnetohydrodynamic evolution and to generate visually interpretable results for discussion.
+
+\subsection{What to inspect for the pulse case}
+Focus on:
+\begin{itemize}[leftmargin=1.8em]
+    \item symmetry of the expanding structures,
+    \item total-mass and total-energy histories,
+    \item evolution of magnetic-field topology in the plots,
+    \item magnetic-divergence behavior.
+\end{itemize}
+
+\section{Stage F: PINN benchmark run}
+Only after the conventional solver is behaving properly should the PINN benchmark be run:
+\begin{center}
+\texttt{pinnResults = pinn\_main\_alfven();}
+\end{center}
+The current PINN benchmark is a reduced shear-Alfv\'en model derived from ideal MHD. It is not yet the full general 2D ideal-MHD PINN. It should be described honestly as a benchmark PINN rather than as the final project endpoint.
+
+\section{Full recommended command block}
+For a first full pass through the repository, the recommended command order is:
+\begin{center}
+\begin{minipage}{0.92\linewidth}
+\ttfamily
+addpath(genpath(pwd))\par
+\par
+\% Core helper tests\par
+test\_variable\_conversion\par
+test\_flux\_functions\par
+test\_time\_step\_and\_wave\_speeds\par
+\par
+\% Finite-volume preservation tests\par
+test\_uniform\_state\_preservation\par
+test\_rk2\_uniform\_state\_preservation\par
+test\_plm\_uniform\_state\_preservation\par
+test\_positivity\_floor\_application\par
+\par
+\% Verification\par
+results = alfven\_wave\_case();\par
+conv = alfven\_wave\_convergence\_study();\par
+\par
+\% Nonlinear demonstration\par
+pulse = magnetic\_pressure\_pulse\_case();\par
+\par
+\% PINN benchmark\par
+pinnResults = pinn\_main\_alfven();
+\end{minipage}
+\end{center}
+
+\section{Where outputs are written}
+The case scripts are designed to write run products into the \texttt{output/} directory. In practice, this includes figures, summary text files, and any saved comparison outputs generated by the verification or demonstration cases.
+
+\section{What to do if something fails}
+If a test or case fails, the next move should be diagnostic rather than additive:
+\begin{enumerate}[leftmargin=1.8em]
+    \item stop the run sequence,
+    \item note the exact MATLAB line number and error text,
+    \item identify whether the failure occurred in a helper function, numerical update, plotting function, or PINN routine,
+    \item fix that failure before running the next stage.
+\end{enumerate}
+
+\begin{overviewbox}
+\textbf{Bottom line.} The repository should be used as a staged verification workflow, not as a one-click black box. The recommended order is tests $\rightarrow$ Alfv\'en verification $\rightarrow$ convergence study $\rightarrow$ nonlinear pulse $\rightarrow$ PINN benchmark.
+\end{overviewbox}
+
+\end{document}

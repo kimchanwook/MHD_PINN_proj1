@@ -1,0 +1,262 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[table]{xcolor}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs,array,longtable,tabularx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+
+\definecolor{TitleBlue}{HTML}{163A5F}
+\definecolor{AccentTeal}{HTML}{2D6F73}
+\definecolor{SoftBlue}{HTML}{EAF3F8}
+\definecolor{SoftTeal}{HTML}{EDF8F6}
+\definecolor{SoftGray}{HTML}{F5F7FA}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{PINN for Two-Dimensional MHD Evolution}
+\rhead{Implementation Note}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+\titleformat{\section}{\Large\bfseries\color{TitleBlue}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
+
+\newtcolorbox{overviewbox}{colback=SoftBlue,colframe=TitleBlue,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newtcolorbox{implbox}{colback=SoftTeal,colframe=AccentTeal,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \bfseries \color{TitleBlue} Implementation Note: MATLAB File Map and Dependency Guide}\\[0.5em]
+    {\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}
+\end{center}
+
+\vspace{0.5em}
+
+\begin{overviewbox}
+\textbf{Purpose.} This note explains what each major MATLAB file does, how the folders are organized, and how the pieces depend on one another. It is intended as a practical orientation document for someone trying to understand or present the repository quickly.
+\end{overviewbox}
+
+\section{Top-level files}
+\begin{center}
+\begin{tabular}{p{0.28\linewidth} p{0.60\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{README.md} & top-level project description and repository entry point \\
+\texttt{project\_plan.md} & staged development plan and project roadmap \\
+\texttt{run\_all.m} & intended umbrella entry point for broad execution workflows \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Folder overview}
+The repository separates code by function:
+\begin{itemize}[leftmargin=1.8em]
+    \item \texttt{src/physics}: physical variable conversions, thermodynamic helpers, physical fluxes, and state-sanity utilities,
+    \item \texttt{src/numerics}: boundary conditions, reconstruction, numerical flux assembly, right-hand-side construction, and time integrators,
+    \item \texttt{src/init}: initial-condition builders,
+    \item \texttt{src/diagnostics}: error norms, phase-speed estimates, conservation metrics, and magnetic-divergence diagnostics,
+    \item \texttt{src/plotting}: plotting utilities for verification and nonlinear demonstration cases,
+    \item \texttt{src/grid}: grid generation,
+    \item \texttt{src/utils}: small reusable helper functions,
+    \item \texttt{tests}: low-level and regression-style test scripts,
+    \item \texttt{cases}: reproducible top-level solver runs,
+    \item \texttt{pinn}: physics-informed neural network routines,
+    \item \texttt{docs}: physics notes and implementation notes.
+\end{itemize}
+
+\section{Source files: physics layer}
+\begin{center}
+\begin{tabular}{p{0.33\linewidth} p{0.55\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{primitive\_to\_conserved.m} & maps primitive variables $(\rho,u_x,u_y,u_z,p,B_x,B_y,B_z)$ to conserved variables \\
+\texttt{conserved\_to\_primitive.m} & recovers primitive variables from the conserved state \\
+\texttt{compute\_pressure.m} & reconstructs gas pressure from conserved variables \\
+\texttt{compute\_total\_energy.m} & builds total energy density from primitive variables \\
+\texttt{flux\_x.m} & physical ideal-MHD flux in the $x$ direction \\
+\texttt{flux\_y.m} & physical ideal-MHD flux in the $y$ direction \\
+\texttt{fast\_magnetosonic\_speed\_x.m} & directional fast-wave speed estimate for interfaces normal to $x$ \\
+\texttt{fast\_magnetosonic\_speed\_y.m} & directional fast-wave speed estimate for interfaces normal to $y$ \\
+\texttt{default\_positivity\_settings.m} & creates default positivity-floor configuration \\
+\texttt{apply\_positivity\_floors.m} & enforces density and pressure floors after an update when enabled \\
+\texttt{check\_physical\_state.m} & sanity checks for physically admissible states \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Source files: numerics layer}
+\begin{center}
+\begin{tabular}{p{0.33\linewidth} p{0.55\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{apply\_periodic\_bc.m} & adds one layer of periodic ghost cells around the physical domain \\
+\texttt{compute\_time\_step.m} & computes the explicit time step from the Courant-Friedrichs-Lewy condition \\
+\texttt{rusanov\_flux\_x.m} & numerical interface flux in the $x$ direction \\
+\texttt{rusanov\_flux\_y.m} & numerical interface flux in the $y$ direction \\
+\texttt{compute\_rhs.m} & first-order semi-discrete right-hand side using piecewise-constant states \\
+\texttt{compute\_rhs\_plm.m} & higher-order right-hand side using piecewise-linear reconstruction \\
+\texttt{reconstruct\_plm\_minmod.m} & piecewise-linear state reconstruction with the minmod limiter \\
+\texttt{update\_fv\_euler.m} & forward-Euler finite-volume update \\
+\texttt{update\_fv\_rk2.m} & second-order Runge-Kutta update for the first-order spatial operator \\
+\texttt{update\_fv\_rk2\_plm.m} & second-order Runge-Kutta update paired with piecewise-linear reconstruction \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{implbox}
+\textbf{Dependency idea.} The numerics layer calls the physics layer repeatedly. For example, a time-step routine needs wave speeds, and a Rusanov flux routine needs both physical fluxes and directional characteristic speeds.
+\end{implbox}
+
+\section{Source files: initialization, diagnostics, plotting, and utilities}
+\subsection{Initialization}
+\begin{center}
+\begin{tabular}{p{0.33\linewidth} p{0.55\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{init\_alfven\_wave.m} & builds the small-amplitude shear-Alfv\'en verification initial condition \\
+\texttt{init\_magnetic\_pressure\_pulse.m} & builds the nonlinear magnetic-pressure-pulse initial condition \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Diagnostics}
+\begin{center}
+\begin{tabular}{p{0.33\linewidth} p{0.55\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{compute\_l2\_error.m} & computes a discrete $L^2$ error norm \\
+\texttt{measure\_alfven\_phase\_speed.m} & estimates the Alfv\'en phase speed from periodic line-cut data \\
+\texttt{compute\_divB.m} & estimates magnetic divergence on the grid \\
+\texttt{compute\_total\_mass.m} & computes total mass over the domain \\
+\texttt{compute\_total\_energy\_domain.m} & computes total energy over the domain \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Plotting and utilities}
+\begin{center}
+\begin{tabular}{p{0.33\linewidth} p{0.55\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{plot\_alfven\_linecuts.m} & numerical-versus-exact line cuts for the Alfv\'en benchmark \\
+\texttt{plot\_pulse\_fields.m} & field plots and visualization for the magnetic-pressure-pulse case \\
+\texttt{make\_uniform\_grid.m} & creates the uniform Cartesian grid object used throughout the project \\
+\texttt{minmod.m} & limiter helper used by the piecewise-linear reconstruction routine \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Case scripts}
+\begin{center}
+\begin{tabular}{p{0.33\linewidth} p{0.55\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{alfven\_wave\_case.m} & primary verification run for the small-amplitude Alfv\'en benchmark \\
+\texttt{alfven\_wave\_convergence\_study.m} & repeated verification run across multiple grid sizes \\
+\texttt{magnetic\_pressure\_pulse\_case.m} & nonlinear demonstration problem for localized magnetic overpressure \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The case scripts should stay thin. Their job is to assemble a complete experiment from reusable lower-level components rather than to contain duplicated numerical logic.
+
+\section{Test scripts}
+\begin{center}
+\begin{tabular}{p{0.33\linewidth} p{0.55\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{test\_variable\_conversion.m} & variable conversion consistency check \\
+\texttt{test\_flux\_functions.m} & ideal-MHD physical flux sanity checks \\
+\texttt{test\_time\_step\_and\_wave\_speeds.m} & time-step and characteristic-speed checks \\
+\texttt{test\_uniform\_state\_preservation.m} & first-order uniform-state preservation \\
+\texttt{test\_rk2\_uniform\_state\_preservation.m} & Runge-Kutta uniform-state preservation \\
+\texttt{test\_plm\_uniform\_state\_preservation.m} & piecewise-linear uniform-state preservation \\
+\texttt{test\_positivity\_floor\_application.m} & positivity-floor behavior check \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{PINN files}
+\subsection{Current PINN philosophy}
+The PINN side is split into two layers:
+\begin{enumerate}[leftmargin=1.8em]
+    \item a working reduced shear-Alfv\'en PINN benchmark,
+    \item a broader full ideal-MHD residual scaffold that is not yet a complete validated training pipeline.
+\end{enumerate}
+
+\begin{center}
+\begin{tabular}{p{0.33\linewidth} p{0.55\linewidth}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\texttt{pinn\_main\_alfven.m} & top-level entry point for the reduced Alfv\'en PINN benchmark \\
+\texttt{pinn\_default\_params.m} & default network, sampling, and optimizer parameters \\
+\texttt{pinn\_build\_network.m} & neural-network construction \\
+\texttt{pinn\_sample\_collocation\_points.m} & collocation-point generation for residual enforcement \\
+\texttt{pinn\_predict\_fields.m} & network output interpretation as physical fields \\
+\texttt{pinn\_apply\_ic\_bc.m} & initial-condition and boundary-condition loss terms \\
+\texttt{pinn\_ideal\_mhd\_residuals\_alfven.m} & reduced shear-Alfv\'en residuals derived from ideal MHD \\
+\texttt{pinn\_model\_gradients\_alfven.m} & gradient assembly for reduced PINN training \\
+\texttt{pinn\_compute\_losses.m} & benchmark loss breakdown for the reduced Alfv\'en PINN \\
+\texttt{pinn\_train\_alfven.m} & reduced PINN training loop \\
+\texttt{pinn\_plot\_training\_history.m} & training-history visualization \\
+\texttt{pinn\_plot\_comparison\_alfven.m} & solver-versus-PINN comparison plots \\
+\texttt{pinn\_compare\_with\_solver.m} & comparison wrapper against the conventional solver \\
+\texttt{pinn\_ideal\_mhd\_residuals\_general.m} & scaffold for broader 2D ideal-MHD residual evaluation \\
+\texttt{pinn\_compute\_losses\_general.m} & scaffolded loss wrapper for the broader residual engine \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Dependency ladder for understanding the code}
+The most efficient way to understand the repository is:
+\begin{enumerate}[leftmargin=1.8em]
+    \item start with the state-conversion and flux functions,
+    \item move to the numerical flux and right-hand-side assembly,
+    \item then inspect the update routines,
+    \item then read the initialization and diagnostics files,
+    \item then look at the case scripts,
+    \item only after that inspect the PINN folder.
+\end{enumerate}
+
+\section{What is stable versus still exploratory}
+\textbf{Relatively stable at the current stage:}
+\begin{itemize}[leftmargin=1.8em]
+    \item grid generation,
+    \item state conversion,
+    \item physical flux routines,
+    \item Rusanov-based finite-volume solver path,
+    \item Alfv\'en-wave and pulse-case script structure,
+    \item low-level tests and preservation tests.
+\end{itemize}
+
+\textbf{Still exploratory or scaffolded:}
+\begin{itemize}[leftmargin=1.8em]
+    \item broader full ideal-MHD PINN training pipeline,
+    \item general residual normalization and loss balancing,
+    \item more advanced benchmarks such as a truly oblique 2D Alfv\'en wave.
+\end{itemize}
+
+\begin{overviewbox}
+\textbf{Bottom line.} The repository is easiest to understand if it is read as a ladder: physics layer $\rightarrow$ numerics layer $\rightarrow$ diagnostics and cases $\rightarrow$ PINN benchmark $\rightarrow$ general PINN scaffold. The conventional solver is already the core of the project; the PINN side is built on top of that foundation.
+\end{overviewbox}
+
+\end{document}

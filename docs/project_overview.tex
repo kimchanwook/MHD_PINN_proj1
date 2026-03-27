@@ -1,0 +1,246 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[table]{xcolor}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{booktabs,array,longtable,tabularx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+
+\definecolor{TitleBlue}{HTML}{163A5F}
+\definecolor{AccentTeal}{HTML}{2D6F73}
+\definecolor{SoftBlue}{HTML}{EAF3F8}
+\definecolor{SoftTeal}{HTML}{EDF8F6}
+\definecolor{SoftGray}{HTML}{F5F7FA}
+\definecolor{RuleGray}{HTML}{D7DEE8}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{PINN for Two-Dimensional MHD Evolution}
+\rhead{Project Overview}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+\titleformat{\section}{\Large\bfseries\color{TitleBlue}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{TitleBlue}}{\thesubsubsection}{0.6em}{}
+
+\newtcolorbox{overviewbox}{
+  colback=SoftBlue,
+  colframe=TitleBlue,
+  boxrule=0.8pt,
+  arc=2mm,
+  left=3mm,right=3mm,top=2mm,bottom=2mm
+}
+
+\newtcolorbox{physicsbox}{
+  colback=SoftTeal,
+  colframe=AccentTeal,
+  boxrule=0.8pt,
+  arc=2mm,
+  left=3mm,right=3mm,top=2mm,bottom=2mm
+}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \bfseries \color{TitleBlue} Project Overview: Physics-Informed Neural Network for Two-Dimensional MHD Evolution}\\[0.5em]
+    {\large \color{AccentTeal} Clean introductory guide to the project goals, module structure, and physics logic}\\[0.8em]
+    {\normalsize Purpose: explain the project plainly before the reader enters the detailed physics notes or MATLAB implementation notes.}
+\end{center}
+
+\vspace{0.5em}
+
+\begin{overviewbox}
+\textbf{What this project is trying to do.} The project builds a conventional two-dimensional \textbf{magnetohydrodynamic (MHD)} solver in MATLAB first, verifies it on an \textbf{Alfv\'en wave}, demonstrates nonlinear behavior with a \textbf{magnetic pressure pulse}, and then uses those verified physics problems as the basis for a \textbf{physics-informed neural network (PINN)} study. The key design philosophy is that the neural-network stage should come \emph{after} the governing physics and conventional numerics are understood and checked.
+\end{overviewbox}
+
+\section{Symbol and acronym table}
+
+\rowcolors{2}{SoftGray}{white}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.20\textwidth} >{\raggedright\arraybackslash}p{0.28\textwidth} >{\raggedright\arraybackslash}p{0.42\textwidth}}
+\toprule
+\textbf{Symbol / acronym} & \textbf{Name} & \textbf{Meaning in this project} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Symbol / acronym} & \textbf{Name} & \textbf{Meaning in this project} \\
+\midrule
+\endhead
+MHD & magnetohydrodynamics & Continuum model of a conducting fluid or plasma coupled to a magnetic field. \\
+PINN & physics-informed neural network & Neural network trained using governing-equation residuals together with boundary and initial conditions. \\
+$\rho$ & mass density & Mass per unit volume of the plasma. \\
+$p$ & gas pressure & Thermal pressure of the plasma fluid. \\
+$\mathbf{u}=(u_x,u_y,u_z)$ & fluid velocity & Bulk flow speed of the plasma. \\
+$\mathbf{B}=(B_x,B_y,B_z)$ & magnetic field & Magnetic-field vector evolved by the solver. \\
+$E$ & total energy density & Sum of internal, kinetic, and magnetic energy densities. \\
+$\gamma$ & ratio of specific heats & Ideal-gas closure parameter, commonly chosen as $5/3$. \\
+$v_A$ & Alfv\'en speed & Characteristic wave speed associated with magnetic tension and plasma inertia. \\
+$\nabla\cdot\mathbf{B}$ & magnetic divergence & Quantity that should remain zero in physically consistent MHD. \\
+PLM & piecewise-linear method & Reconstruction method that gives higher spatial accuracy than piecewise-constant reconstruction. \\
+RK2 & second-order Runge--Kutta & Two-stage explicit time integrator used to improve time accuracy. \\
+CFL & Courant--Friedrichs--Lewy & Stability condition that limits the explicit time step based on signal speeds and grid spacing. \\
+$\Delta x, \Delta y$ & cell widths & Spatial grid spacing in the $x$ and $y$ directions. \\
+$\Delta t$ & time step & Time increment used in explicit time marching. \\
+$L^2$ error & root-mean-square error & Quantitative measure of the difference between numerical and reference solutions. \\
+\bottomrule
+\end{longtable}
+
+\section{Plain-language statement of the project}
+
+The central scientific question of this project is: \emph{can we build a credible physics workflow in which a conventional MHD solver establishes trustworthy plasma dynamics first, and a PINN is then used as a physics-constrained surrogate or alternative solver for the same benchmark problems?}
+
+That question is important because MHD and PINNs are often paired in ways that look modern but are not actually scientifically well structured. In this project, the order is intentionally reversed from that common mistake. The conventional solver comes first because it forces the physics, numerics, and diagnostics to be made explicit. Only after that foundation exists does the PINN enter.
+
+\begin{physicsbox}
+\textbf{Guiding philosophy.} The PINN is not the physics. The governing equations are the physics. The conventional solver is the first instrument used to check that those equations are being applied and interpreted correctly.
+\end{physicsbox}
+
+\section{Why MHD is the right model for this project}
+
+A plasma contains charged particles, so it responds to electric and magnetic fields. When the spatial and temporal scales of interest are large compared with microscopic kinetic scales, it is often useful to treat the plasma as a conducting fluid rather than tracking every particle individually. That fluid-level description is MHD.
+
+For this project, MHD is a natural choice because the goal is not to resolve kinetic particle physics in detail. The goal is to model field-fluid evolution cleanly enough to support wave verification, nonlinear magnetic-pressure dynamics, and physics-informed machine learning.
+
+Two physical ideas dominate the project:
+\begin{enumerate}[leftmargin=1.8em]
+    \item the magnetic field stores energy and exerts stress on the fluid,
+    \item the fluid motion and magnetic field evolve together rather than separately.
+\end{enumerate}
+
+This coupling is exactly why MHD supports waves such as the Alfv\'en wave and nonlinear structures such as pressure-driven magnetic pulses.
+
+\section{Why the project starts with an Alfv\'en wave}
+
+An Alfv\'en wave is one of the most fundamental wave modes in MHD. It is physically useful because it isolates the interaction between plasma inertia and magnetic tension. If a magnetic field line is displaced sideways, magnetic tension tries to restore it, while the mass density of the plasma resists acceleration. The result is a transverse wave that propagates along the magnetic field.
+
+This makes the Alfv\'en wave an excellent verification problem. It is simple enough to understand analytically, but still genuinely MHD. It therefore tests whether the code is capturing the right coupling between velocity and magnetic-field perturbations.
+
+The project uses the Alfv\'en wave in two roles:
+\begin{enumerate}[leftmargin=1.8em]
+    \item as the first quantitative verification case for the conventional solver,
+    \item as the first controlled benchmark for the PINN.
+\end{enumerate}
+
+\section{Why the project also needs a magnetic pressure pulse}
+
+A wave-verification problem is necessary, but not sufficient. A strong interview project should show not only that the solver reproduces a clean benchmark, but also that it can evolve something more visibly nonlinear.
+
+That is why the project includes a magnetic pressure pulse. In this case, the magnetic field is initialized with a localized enhancement. Because magnetic energy density scales with the square of the magnetic-field strength, the enhanced region acts like a region of larger magnetic pressure. That localized magnetic overpressure pushes on the surrounding plasma and launches nonlinear dynamics.
+
+This second case plays a different role from the Alfv\'en wave. It is not mainly about exact comparison against a simple analytic solution. It is about demonstrating that the solver can evolve a physically intuitive, nonlinear MHD configuration while tracking conservation behavior and magnetic-divergence control.
+
+\section{Module-by-module overview}
+
+\subsection{Module 0: project overview and roadmap}
+The purpose of this module is orientation. It explains what the project is trying to accomplish, why the solver comes before the PINN, and how the different benchmark problems fit together.
+
+\textbf{Physics objective.} Establish the physical storyline of the project before any heavy derivation or code details are introduced.
+
+\textbf{Numerical or machine-learning objective.} None directly. This module is conceptual rather than computational.
+
+\subsection{Module 1: ideal MHD equations}
+This module derives the governing equations used by the conventional solver. It defines the conserved variables, total energy, fluxes, and the role of the divergence-free condition on the magnetic field.
+
+\textbf{Physics objective.} Show exactly what equations are being solved, what each term means physically, and why the state vector contains both fluid and magnetic quantities.
+
+\textbf{Numerical objective.} Make the finite-volume formulation possible by putting the equations into conservative form.
+
+\subsection{Module 2: Alfv\'en-wave verification}
+This module uses a small-amplitude Alfv\'en wave as the first benchmark. The background plasma and magnetic field are uniform, and the perturbation is introduced in a controlled way so that the expected propagation speed is known.
+
+\textbf{Physics objective.} Verify that the solver captures the coupling between transverse velocity and magnetic-field perturbations.
+
+\textbf{Numerical objective.} Measure wave speed, track $L^2$ error, assess numerical diffusion, and confirm that grid refinement improves the solution.
+
+\subsection{Module 3: PINN for the Alfv\'en benchmark}
+This module builds the first PINN around the Alfv\'en-wave benchmark. The problem is deliberately controlled so that the neural-network formulation is tested on a case whose physics is already understood.
+
+\textbf{Physics objective.} Preserve the benchmark physics while moving to a neural-network representation.
+
+\textbf{Machine-learning objective.} Train a PINN using equation residuals and boundary or initial conditions, then compare the predicted fields against the verified solver result.
+
+\subsection{Module 4: numerical method}
+This module explains the conventional numerical machinery: finite-volume discretization, Rusanov interface fluxes, periodic boundary conditions, RK2 time stepping, and piecewise-linear reconstruction with a limiter.
+
+\textbf{Physics objective.} Clarify how the mathematical conservation laws are translated into a stable discrete algorithm.
+
+\textbf{Numerical objective.} Document the actual solver design choices and why they were made for robustness and interpretability.
+
+\subsection{Module 5: magnetic pressure pulse}
+This module introduces a localized magnetic-field enhancement and lets the conventional solver evolve the resulting nonlinear dynamics.
+
+\textbf{Physics objective.} Show how magnetic pressure can drive plasma motion and create visibly nonlinear behavior.
+
+\textbf{Numerical objective.} Demonstrate that the solver can handle a problem more demanding than a small-amplitude wave, while still tracking conservation diagnostics and magnetic-divergence behavior.
+
+\subsection{Module 6: broader PINN residual structure and future extensions}
+This module is the bridge to future work. It expands from the reduced Alfv\'en-case PINN toward a broader ideal-MHD PINN residual structure.
+
+\textbf{Physics objective.} Preserve the full MHD coupling rather than only the reduced wave subsystem.
+
+\textbf{Machine-learning objective.} Move from a benchmark-specific PINN to a more general physics-informed formulation that can eventually target genuinely two-dimensional MHD evolution.
+
+\section{How the MATLAB pieces fit together}
+
+The project is intentionally split into separate layers so the reader can understand the code by function rather than by chronology.
+
+\begin{itemize}[leftmargin=1.8em]
+    \item \texttt{src/physics/} contains variable conversion, thermodynamics, wave speeds, and physical flux functions.
+    \item \texttt{src/numerics/} contains boundary-condition handling, reconstruction, numerical fluxes, right-hand-side assembly, and time stepping.
+    \item \texttt{src/init/} contains initial-condition builders for the benchmark problems.
+    \item \texttt{src/diagnostics/} contains error norms, magnetic-divergence checks, and conservation diagnostics.
+    \item \texttt{cases/} contains reproducible top-level runs such as the Alfv\'en-wave case and magnetic pressure pulse case.
+    \item \texttt{pinn/} contains the PINN scaffolding, residual definitions, training logic, and solver-comparison utilities.
+    \item \texttt{docs/} contains both physics notes and implementation notes.
+\end{itemize}
+
+This structure is deliberate. A strong interview project should not look like one long script. It should look like a small research code with understandable layers.
+
+\section{Current scientific status of the project}
+
+At the current stage, the project already contains:
+\begin{enumerate}[leftmargin=1.8em]
+    \item a conventional ideal-MHD solver backbone in MATLAB,
+    \item Alfv\'en-wave verification infrastructure,
+    \item a nonlinear magnetic pressure pulse case,
+    \item reconstruction, RK2 time stepping, and positivity safeguards,
+    \item a reduced PINN benchmark for the Alfv\'en problem,
+    \item a broader but still incomplete general ideal-MHD PINN scaffold.
+\end{enumerate}
+
+The most important remaining step is not to add more conceptual scope immediately, but to run the code locally, verify the conventional solver quantitatively, and then decide how aggressively to generalize the PINN.
+
+\begin{physicsbox}
+\textbf{Practical interpretation.} Right now, the most valuable scientific question is not ``how many more features can be added?'' but ``does the existing solver run cleanly, produce the expected Alfv\'en speed, and show sensible convergence and magnetic-divergence behavior?''
+\end{physicsbox}
+
+\section{How to read the project documents in the right order}
+
+A new reader should ideally move through the project in this order:
+\begin{enumerate}[leftmargin=1.8em]
+    \item read this project overview first,
+    \item read the ideal-MHD equations note,
+    \item read the numerical-method note,
+    \item read the Alfv\'en verification note,
+    \item read the run-workflow and file-map implementation notes,
+    \item run the solver tests and benchmark cases,
+    \item then read the PINN notes and inspect the PINN code.
+\end{enumerate}
+
+That order mirrors the actual logic of the project: physics first, numerical verification second, machine learning third.
+
+\section{Concluding summary}
+
+This project is designed to be more than a code exercise. It is meant to be a coherent technical story. The story begins with ideal MHD as the governing plasma model, validates the conventional solver on an Alfv\'en wave, extends to a nonlinear magnetic pressure pulse, and only then uses those physics problems as the basis for PINN work.
+
+That sequencing matters. It makes the project scientifically legible, numerically defensible, and much stronger as an interview project than a workflow that begins with a neural network and only later asks what physics it was supposed to learn.
+
+\end{document}

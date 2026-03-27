@@ -1,0 +1,97 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[table]{xcolor}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs,array,longtable}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+
+\definecolor{TitleBlue}{HTML}{163A5F}
+\definecolor{AccentTeal}{HTML}{2D6F73}
+\definecolor{SoftBlue}{HTML}{EAF3F8}
+\definecolor{SoftTeal}{HTML}{EDF8F6}
+\definecolor{SoftGray}{HTML}{F5F7FA}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{PINN for Two-Dimensional MHD Evolution}
+\rhead{Implementation Note}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+\titleformat{\section}{\Large\bfseries\color{TitleBlue}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
+
+\newtcolorbox{overviewbox}{colback=SoftBlue,colframe=TitleBlue,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newtcolorbox{implbox}{colback=SoftTeal,colframe=AccentTeal,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \bfseries \color{TitleBlue} Implementation Note: General Ideal-MHD PINN Residual Engine}\\[0.5em]
+    {\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}
+\end{center}
+
+\vspace{0.5em}
+
+\begin{overviewbox}
+\textbf{Purpose.} This note explains what the new general residual engine adds relative to the reduced Alfv\'en PINN, and why it is included now as a scaffold rather than advertised as a finished full-PINN capability.
+\end{overviewbox}
+
+\section{What changed}
+The earlier executable PINN in this project used a reduced shear-Alfv\'en subsystem. That was the right first step because it matched the first verification benchmark exactly and kept the training problem controllable.
+
+The new file \texttt{pinn\_ideal\_mhd\_residuals\_general.m} broadens the residual definition to include the full primitive-form ideal-MHD system in two spatial dimensions with three vector components, often called 2.5D MHD.
+
+\section{Residual groups now represented}
+The scaffolded general engine includes residuals for:
+\begin{enumerate}[leftmargin=1.8em]
+    \item continuity,
+    \item momentum in $x$,
+    \item momentum in $y$,
+    \item momentum in $z$,
+    \item adiabatic pressure evolution,
+    \item induction for $B_x$,
+    \item induction for $B_y$,
+    \item induction for $B_z$,
+    \item magnetic divergence constraint.
+\end{enumerate}
+
+\section{Why primitive form was chosen here}
+The network outputs primitive variables directly. Because of that, a primitive-form residual engine is easier to write and debug than a fully conservative residual engine derived from network-predicted conserved variables. The primitive form is therefore a reasonable intermediate step.
+
+\begin{implbox}
+\textbf{Caution.} Easier to implement does not mean easier to train. Primitive-form PINNs can be more sensitive to scaling and loss balancing, especially for strongly nonlinear coupled systems such as ideal MHD.
+\end{implbox}
+
+\section{Why the broader engine is not yet the main training path}
+There are several technical reasons:
+\begin{itemize}[leftmargin=1.8em]
+    \item the general residual set is much stiffer than the reduced Alfv\'en system,
+    \item density, pressure, and magnetic-field terms can produce losses of very different magnitudes,
+    \item the training problem becomes much more sensitive to point sampling and normalization,
+    \item stable and interpretable training usually requires additional infrastructure such as adaptive loss weights or staged curriculum training.
+\end{itemize}
+
+\section{How to extend it next}
+The most sensible next extension is not to immediately throw all equations into one training run and hope for the best. The sensible extension is:
+\begin{enumerate}[leftmargin=1.8em]
+    \item normalize the fields and residuals carefully,
+    \item test the general engine on a near-linear benchmark,
+    \item add diagnostic plots for residual-group magnitudes during training,
+    \item only then broaden to more nonlinear cases such as the magnetic pressure pulse.
+\end{enumerate}
+
+\begin{overviewbox}
+\textbf{Bottom line.} The project now contains a scientifically honest bridge between the working reduced PINN and a broader general ideal-MHD PINN. That bridge is useful because it records the correct equations and derivative structure without pretending that the full training problem has already been solved.
+\end{overviewbox}
+
+\end{document}

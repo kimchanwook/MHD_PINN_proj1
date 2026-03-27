@@ -1,0 +1,135 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[table]{xcolor}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs,array,longtable,tabularx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+
+\definecolor{TitleBlue}{HTML}{163A5F}
+\definecolor{AccentTeal}{HTML}{2D6F73}
+\definecolor{SoftBlue}{HTML}{EAF3F8}
+\definecolor{SoftTeal}{HTML}{EDF8F6}
+\definecolor{SoftGray}{HTML}{F5F7FA}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{PINN for Two-Dimensional MHD Evolution}
+\rhead{Implementation Note}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+\titleformat{\section}{\Large\bfseries\color{TitleBlue}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
+
+\newtcolorbox{overviewbox}{colback=SoftBlue,colframe=TitleBlue,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newtcolorbox{implbox}{colback=SoftTeal,colframe=AccentTeal,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \bfseries \color{TitleBlue} Implementation Note: Conventional Solver and PINN Architecture}\\[0.5em]
+    {\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}
+\end{center}
+
+\vspace{0.5em}
+
+\begin{overviewbox}
+\textbf{Purpose.} This note records how the project is implemented at the code-organization level. It is intentionally more software-facing than the physics notes. The goal is to make it easy to explain, modify, and extend the project during interview preparation.
+\end{overviewbox}
+
+\section{Project design philosophy}
+The repository is organized around a deliberate separation of concerns:
+\begin{enumerate}[leftmargin=1.8em]
+    \item \textbf{physics}: equations, variable conversion, characteristic speeds, and physical-state checks,
+    \item \textbf{numerics}: ghost cells, interface fluxes, reconstruction, spatial operators, and time integration,
+    \item \textbf{init}: reusable initialization functions for benchmark problems,
+    \item \textbf{diagnostics}: error norms, conservation tracking, and magnetic-divergence monitoring,
+    \item \textbf{plotting}: visualization routines that are case-agnostic when possible,
+    \item \textbf{cases}: thin scripts that assemble a full experiment from reusable pieces,
+    \item \textbf{pinn}: neural-network-specific code, kept separate from the conventional solver.
+\end{enumerate}
+
+\begin{implbox}
+\textbf{Why this matters.} A project becomes easier to explain when each file has one clear role. Interviewers usually care as much about how you structure technical work as they do about the equations themselves.
+\end{implbox}
+
+\section{State conventions}
+The code uses one fixed ordering for primitive variables and one fixed ordering for conserved variables. That convention is kept consistent across the entire repository. This avoids one of the most common failure modes in multiphysics projects: hidden variable-order drift between files.
+
+\subsection{Primitive ordering}
+\begin{center}
+$(\rho, u_x, u_y, u_z, p, B_x, B_y, B_z)$
+\end{center}
+
+\subsection{Conserved ordering}
+\begin{center}
+$(\rho, \rho u_x, \rho u_y, \rho u_z, E, B_x, B_y, B_z)$
+\end{center}
+
+\section{Conventional solver data flow}
+One conventional-solver run follows this pattern:
+\begin{enumerate}[leftmargin=1.8em]
+    \item a case script builds the grid and initialization parameters,
+    \item an initialization function creates the starting primitive state,
+    \item primitive variables are converted to conserved form,
+    \item the time loop calls the update routine,
+    \item the update routine calls the right-hand-side routine,
+    \item the right-hand-side routine handles ghost cells, reconstruction, numerical fluxes, and flux differences,
+    \item diagnostics and plotting are run after selected steps or at the end.
+\end{enumerate}
+
+\section{Current solver maturity}
+At the present stage, the solver includes:
+\begin{itemize}[leftmargin=1.8em]
+    \item first-order and piecewise-linear spatial options,
+    \item forward Euler and second-order Runge-Kutta time integrators,
+    \item Rusanov interface fluxes,
+    \item periodic boundaries for the verification problems,
+    \item positivity-floor support,
+    \item Alfv\'en-wave and magnetic-pressure-pulse cases,
+    \item basic regression-style tests for uniform-state preservation and helper functions.
+\end{itemize}
+
+\section{PINN side architecture}
+The PINN directory is intentionally kept separate from the solver core. This prevents neural-network code from contaminating the conventional solver and makes it easier to argue that the solver is independently meaningful.
+
+\subsection{Current PINN status}
+There are now two PINN layers in the project:
+\begin{enumerate}[leftmargin=1.8em]
+    \item a \textbf{working reduced Alfv\'en PINN} specialized to the first verification benchmark,
+    \item a \textbf{broader ideal-MHD residual engine scaffold} that computes residuals for the full 2D (2.5D) primitive-form ideal-MHD system but is not yet wired into a stable, production-quality training workflow.
+\end{enumerate}
+
+\section{Why the general PINN is scaffolded rather than claimed finished}
+A full ideal-MHD PINN is substantially harder than the reduced Alfv\'en case for three reasons:
+\begin{enumerate}[leftmargin=1.8em]
+    \item the equations are strongly coupled and nonlinear,
+    \item multiple fields evolve on different scales and need careful normalization,
+    \item the loss landscape is much harder to balance than in the reduced benchmark.
+\end{enumerate}
+
+That is why the implementation note records the broader residual engine honestly as the \emph{next scaffolded stage}, not as something already fully validated.
+
+\section{Recommended near-term extensions}
+The cleanest next implementation steps are:
+\begin{enumerate}[leftmargin=1.8em]
+    \item add a normalization layer for the general PINN residuals,
+    \item introduce adaptive or manually scheduled loss weights,
+    \item add a small oblique Alfv\'en-wave benchmark that truly varies in both $x$ and $y$,
+    \item add implementation notes for the PINN training workflow and diagnostics.
+\end{enumerate}
+
+\begin{overviewbox}
+\textbf{Bottom line.} The codebase is now organized in a way that supports both scientific explanation and future extension. The conventional solver is already a coherent interview project on its own, and the PINN side now has both a working benchmark model and an honest path toward a broader ideal-MHD formulation.
+\end{overviewbox}
+
+\end{document}
