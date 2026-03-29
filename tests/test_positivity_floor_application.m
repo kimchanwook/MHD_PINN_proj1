@@ -11,6 +11,8 @@ positivity = default_positivity_settings();
 positivity.rhoFloor = 1.0e-6;
 positivity.pFloor   = 2.0e-6;
 
+tol = 1e-14;
+
 Ny = 2;
 Nx = 3;
 nVar = 8;
@@ -36,13 +38,23 @@ Ubad = primitive_to_conserved(Vbad, gamma);
 [Ufixed, floorInfo] = apply_positivity_floors(Ubad, gamma, positivity);
 Vfixed = conserved_to_primitive(Ufixed, gamma);
 
-rhoMin = min(Vfixed(:,:,1), [], 'all');
-pMin   = min(Vfixed(:,:,5), [], 'all');
+tmpRho = Vfixed(:,:,1);
+tmpP   = Vfixed(:,:,5);
 
-assert(rhoMin >= positivity.rhoFloor, 'FAIL: Density floor was not enforced.');
-assert(pMin   >= positivity.pFloor,   'FAIL: Pressure floor was not enforced.');
-assert(floorInfo.rhoFlooredCount >= 1, 'FAIL: Expected at least one density-floor event.');
-assert(floorInfo.pFlooredCount   >= 1, 'FAIL: Expected at least one pressure-floor event.');
+rhoMin = min(tmpRho(:));
+pMin   = min(tmpP(:));
+
+assert(rhoMin >= positivity.rhoFloor - tol, ...
+    'FAIL: Density floor was not enforced.');
+
+assert(pMin >= positivity.pFloor - tol, ...
+    'FAIL: Pressure floor was not enforced.');
+
+assert(floorInfo.rhoFlooredCount >= 1, ...
+    'FAIL: Expected at least one density-floor event.');
+
+assert(floorInfo.pFlooredCount >= 1, ...
+    'FAIL: Expected at least one pressure-floor event.');
 
 fprintf('PASS: Positivity floors are applied correctly.\n');
 

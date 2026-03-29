@@ -125,7 +125,7 @@ plot(timeHistory, errBzHistory, 'LineWidth', 1.5, 'DisplayName', 'L2 error in B_
 hold off;
 xlabel('time'); ylabel('L2 error');
 title('Alfven-wave error history');
-legend('Location', 'best'); grid on;
+legend('Location', 'best'); grid(gca,'on');
 saveas(figErr, fullfile(outDir, 'alfven_error_history.png'));
 close(figErr);
 
@@ -133,86 +133,50 @@ figDiv = figure('Visible', 'off');
 plot(timeHistory, divBmaxHistory, 'LineWidth', 1.5);
 xlabel('time'); ylabel('max |div B|');
 title('Alfven-wave divergence diagnostic');
-grid on;
+grid(gca,'on');
 saveas(figDiv, fullfile(outDir, 'alfven_divB_history.png'));
 close(figDiv);
 
 summaryFile = fullfile(outDir, 'alfven_summary.txt');
 fid = fopen(summaryFile, 'w');
-fprintf(fid, 'Alfven wave verification summary
-');
-fprintf(fid, '--------------------------------
-');
-fprintf(fid, 'Spatial method        = PLM + minmod limiter
-');
-fprintf(fid, 'Time integrator       = RK2
-');
-fprintf(fid, 'Positivity floors     = enabled
-');
-fprintf(fid, 'rho floor             = %.6e
-', positivity.rhoFloor);
-fprintf(fid, 'p floor               = %.6e
-', positivity.pFloor);
-fprintf(fid, 'Nx = %d
-', Nx);
-fprintf(fid, 'Ny = %d
-', Ny);
-fprintf(fid, 'rho0 = %.6f
-', params.rho0);
-fprintf(fid, 'p0   = %.6f
-', params.p0);
-fprintf(fid, 'B0   = %.6f
-', params.B0);
-fprintf(fid, 'A    = %.6e
-', params.A);
-fprintf(fid, 'mode = %d
-', params.mode);
-fprintf(fid, 'k    = %.6f
-', params.k);
-fprintf(fid, 'vA expected = %.6f
-', params.vA);
-fprintf(fid, 'period      = %.6f
-', params.period);
-fprintf(fid, 'final time  = %.6f
-', t);
-fprintf(fid, 'steps       = %d
-', step);
-fprintf(fid, 'final L2 error in uz = %.6e
-', finalErrUz);
-fprintf(fid, 'final L2 error in Bz = %.6e
-', finalErrBz);
-fprintf(fid, 'measured phase speed = %.6f
-', measuredSpeed);
-fprintf(fid, 'max |div B| final    = %.6e
-', maxAbsDivB);
-fprintf(fid, 'rho min final        = %.6e
-', stateInfo.rhoMin);
-fprintf(fid, 'p min final          = %.6e
-', stateInfo.pMin);
-fprintf(fid, 'positivity floor events      = %d
-', numFloorEvents);
-fprintf(fid, 'total density-floor cells    = %d
-', numRhoFloorCells);
-fprintf(fid, 'total pressure-floor cells   = %d
-', numPFloorCells);
+fprintf(fid, 'Alfven wave verification summary');
+fprintf(fid, '--------------------------------');
+fprintf(fid, 'Spatial method        = PLM + minmod limiter');
+fprintf(fid, 'Time integrator       = RK2');
+fprintf(fid, 'Positivity floors     = enabled');
+fprintf(fid, 'rho floor             = %.6e', positivity.rhoFloor);
+fprintf(fid, 'p floor               = %.6e', positivity.pFloor);
+fprintf(fid, 'Nx = %d', Nx);
+fprintf(fid, 'Ny = %d', Ny);
+fprintf(fid, 'rho0 = %.6f', params.rho0);
+fprintf(fid, 'p0   = %.6f', params.p0);
+fprintf(fid, 'B0   = %.6f', params.B0);
+fprintf(fid, 'A    = %.6e', params.A);
+fprintf(fid, 'mode = %d', params.mode);
+fprintf(fid, 'k    = %.6f', params.k);
+fprintf(fid, 'vA expected = %.6f', params.vA);
+fprintf(fid, 'period      = %.6f', params.period);
+fprintf(fid, 'final time  = %.6f', t);
+fprintf(fid, 'steps       = %d', step);
+fprintf(fid, 'final L2 error in uz = %.6e', finalErrUz);
+fprintf(fid, 'final L2 error in Bz = %.6e', finalErrBz);
+fprintf(fid, 'measured phase speed = %.6f', measuredSpeed);
+fprintf(fid, 'max |div B| final    = %.6e', maxAbsDivB);
+fprintf(fid, 'rho min final        = %.6e', stateInfo.rhoMin);
+fprintf(fid, 'p min final          = %.6e', stateInfo.pMin);
+fprintf(fid, 'positivity floor events      = %d', numFloorEvents);
+fprintf(fid, 'total density-floor cells    = %d', numRhoFloorCells);
+fprintf(fid, 'total pressure-floor cells   = %d', numPFloorCells);
 fclose(fid);
 
-fprintf('Alfven-wave case finished.
-');
-fprintf('Expected Alfven speed  : %.6f
-', params.vA);
-fprintf('Measured phase speed   : %.6f
-', measuredSpeed);
-fprintf('Final L2 error in u_z  : %.6e
-', finalErrUz);
-fprintf('Final L2 error in B_z  : %.6e
-', finalErrBz);
-fprintf('Final max |div B|      : %.6e
-', maxAbsDivB);
-fprintf('Final rho min          : %.6e
-', stateInfo.rhoMin);
-fprintf('Final p min            : %.6e
-', stateInfo.pMin);
+fprintf('Alfven-wave case finished.');
+fprintf('Expected Alfven speed  : %.6f', params.vA);
+fprintf('Measured phase speed   : %.6f', measuredSpeed);
+fprintf('Final L2 error in u_z  : %.6e', finalErrUz);
+fprintf('Final L2 error in B_z  : %.6e', finalErrBz);
+fprintf('Final max |div B|      : %.6e', maxAbsDivB);
+fprintf('Final rho min          : %.6e', stateInfo.rhoMin);
+fprintf('Final p min            : %.6e', stateInfo.pMin);
 
 results = struct();
 results.grid = grid;

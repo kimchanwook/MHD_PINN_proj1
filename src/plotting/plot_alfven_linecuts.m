@@ -1,11 +1,22 @@
-function plot_alfven_linecuts(grid, V, exact, t, outDir)
+function plot_alfven_linecuts(gridData, V, exact, t, outDir)
 % plot_alfven_linecuts
 %
 % Creates line-cut plots for the Alfvén wave verification case.
+%
+% INPUTS:
+%   gridData - grid structure
+%   V        - primitive state at time t, size [Ny, Nx, 8]
+%   exact    - exact solution structure from init_alfven_wave
+%   t        - current simulation time
+%   outDir   - output directory for saved figures
+%
+% PLOTS:
+%   1. Numerical and exact uz along the middle row
+%   2. Numerical and exact Bz along the middle row
 
-midRow = ceil(grid.Ny / 2);
+midRow = ceil(gridData.Ny / 2);
 
-x = grid.xc(:);
+x = gridData.xc(:);
 uz_num = squeeze(V(midRow,:,4)).';
 Bz_num = squeeze(V(midRow,:,8)).';
 
