@@ -1,11 +1,11 @@
-function rhs = compute_rhs(U, grid, gamma)
+function rhs = compute_rhs(U, gridData, gamma)
 % compute_rhs
 %
 % Computes the semi-discrete finite-volume right-hand side for ideal MHD
 % using first-order piecewise-constant states and Rusanov numerical fluxes.
 
-Ny = grid.Ny;
-Nx = grid.Nx;
+Ny = gridData.Ny;
+Nx = gridData.Nx;
 
 Ubc = apply_periodic_bc(U);
 
@@ -19,8 +19,8 @@ URy = Ubc(2:Ny+2,   2:Nx+1, :);
 
 Gy_num = rusanov_flux_y(ULy, URy, gamma);
 
-rhs_x = -(Fx_num(:, 2:Nx+1, :) - Fx_num(:, 1:Nx,   :)) ./ grid.dx;
-rhs_y = -(Gy_num(2:Ny+1, :, :) - Gy_num(1:Ny,   :, :)) ./ grid.dy;
+rhs_x = -(Fx_num(:, 2:Nx+1, :) - Fx_num(:, 1:Nx,   :)) ./ gridData.dx;
+rhs_y = -(Gy_num(2:Ny+1, :, :) - Gy_num(1:Ny,   :, :)) ./ gridData.dy;
 
 rhs = rhs_x + rhs_y;
 

@@ -18,7 +18,7 @@ CFL   = 0.4;
 Nx = 14;
 Ny = 11;
 
-grid = make_uniform_grid(0.0, 1.0, 0.0, 1.0, Nx, Ny);
+gridData = make_uniform_grid(0.0, 1.0, 0.0, 1.0, Nx, Ny);
 
 nVar = 8;
 V = zeros(Ny, Nx, nVar);
@@ -42,9 +42,9 @@ V(:,:,7) = By0;
 V(:,:,8) = Bz0;
 
 U = primitive_to_conserved(V, gamma);
-dt = compute_time_step(U, grid, gamma, CFL);
+dt = compute_time_step(U, gridData, gamma, CFL);
 
-Unew = update_fv_rk2(U, grid, gamma, dt);
+Unew = update_fv_rk2(U, gridData, gamma, dt);
 updateErr = max(abs(Unew(:) - U(:)));
 
 assert(updateErr < 1e-12, 'FAIL: Uniform state changed after RK2 update.');

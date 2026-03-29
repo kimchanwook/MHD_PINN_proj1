@@ -1,4 +1,4 @@
-function samples = pinn_sample_collocation_points(grid, tMin, tMax, params)
+function samples = pinn_sample_collocation_points(gridData, tMin, tMax, params)
 % pinn_sample_collocation_points
 %
 % Generates random sample points for the PINN loss terms.
@@ -18,10 +18,10 @@ Nf = params.numCollocation;
 Ni = params.numInitial;
 Nb = params.numBoundary;
 
-xMin = grid.xMin;
-xMax = grid.xMax;
-yMin = grid.yMin;
-yMax = grid.yMax;
+xMin = gridData.xMin;
+xMax = gridData.xMax;
+yMin = gridData.yMin;
+yMax = gridData.yMax;
 
 samples = struct();
 

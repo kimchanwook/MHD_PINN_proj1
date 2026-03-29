@@ -10,7 +10,7 @@ gamma = 5/3;
 CFL   = 0.4;
 Nx = 14;
 Ny = 10;
-grid = make_uniform_grid(0.0, 1.0, 0.0, 1.0, Nx, Ny);
+gridData = make_uniform_grid(0.0, 1.0, 0.0, 1.0, Nx, Ny);
 
 nVar = 8;
 V = zeros(Ny, Nx, nVar);
@@ -24,11 +24,11 @@ V(:,:,7) = -0.2;
 V(:,:,8) = 0.15;
 
 U = primitive_to_conserved(V, gamma);
-rhs = compute_rhs_plm(U, grid, gamma);
+rhs = compute_rhs_plm(U, gridData, gamma);
 assert(max(abs(rhs(:))) < 1e-12, 'FAIL: Uniform-state rhs is not zero for PLM.');
 
-dt = compute_time_step(U, grid, gamma, CFL);
-Unew = update_fv_rk2_plm(U, grid, gamma, dt);
+dt = compute_time_step(U, gridData, gamma, CFL);
+Unew = update_fv_rk2_plm(U, gridData, gamma, dt);
 assert(max(abs(Unew(:) - U(:))) < 1e-12, 'FAIL: Uniform state changed after PLM RK2 update.');
 
 fprintf('PASS: Uniform state is preserved under PLM + RK2 update.\n');

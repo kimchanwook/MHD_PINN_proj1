@@ -12,7 +12,7 @@ CFL   = 0.4;
 Nx = 10;
 Ny = 12;
 
-grid = make_uniform_grid(0.0, 1.0, 0.0, 1.0, Nx, Ny);
+gridData = make_uniform_grid(0.0, 1.0, 0.0, 1.0, Nx, Ny);
 
 nVar = 8;
 V = zeros(Ny, Nx, nVar);
@@ -37,12 +37,12 @@ V(:,:,8) = Bz0;
 
 U = primitive_to_conserved(V, gamma);
 
-rhs = compute_rhs(U, grid, gamma);
+rhs = compute_rhs(U, gridData, gamma);
 rhs_max = max(abs(rhs(:)));
 assert(rhs_max < 1e-12, 'FAIL: Uniform-state rhs is not zero.');
 
-dt = compute_time_step(U, grid, gamma, CFL);
-Unew = update_fv_euler(U, grid, gamma, dt);
+dt = compute_time_step(U, gridData, gamma, CFL);
+Unew = update_fv_euler(U, gridData, gamma, dt);
 
 update_err = max(abs(Unew(:) - U(:)));
 assert(update_err < 1e-12, 'FAIL: Uniform state changed after Euler update.');

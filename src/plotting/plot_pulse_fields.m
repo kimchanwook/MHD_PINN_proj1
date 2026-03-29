@@ -1,10 +1,10 @@
-function plot_pulse_fields(grid, V, t, outDir, prefix)
+function plot_pulse_fields(gridData, V, t, outDir, prefix)
 % plot_pulse_fields
 %
 % Creates field plots for the magnetic-pressure pulse case.
 %
 % INPUTS:
-%   grid   - grid structure
+%   gridData   - gridData structure
 %   V      - primitive state, size [Ny, Nx, 8]
 %   t      - current time
 %   outDir - output directory
@@ -36,7 +36,7 @@ for i = 1:size(fields,1)
     tag  = fields{i,3};
 
     fig = figure('Visible','off');
-    imagesc(grid.xc, grid.yc, data);
+    imagesc(gridData.xc, gridData.yc, data);
     set(gca,'YDir','normal');
     axis equal tight;
     xlabel('x'); ylabel('y');
@@ -47,11 +47,11 @@ for i = 1:size(fields,1)
 end
 
 fig = figure('Visible','off');
-imagesc(grid.xc, grid.yc, Bmag);
+imagesc(gridData.xc, gridData.yc, Bmag);
 set(gca,'YDir','normal');
 hold on;
-step = max(1, floor(min(grid.Nx, grid.Ny)/24));
-quiver(grid.Xc(1:step:end,1:step:end), grid.Yc(1:step:end,1:step:end), ...
+step = max(1, floor(min(gridData.Nx, gridData.Ny)/24));
+quiver(gridData.Xc(1:step:end,1:step:end), gridData.Yc(1:step:end,1:step:end), ...
        Bx(1:step:end,1:step:end), By(1:step:end,1:step:end), 'k');
 hold off;
 axis equal tight;

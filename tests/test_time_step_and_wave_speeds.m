@@ -1,7 +1,7 @@
 function test_time_step_and_wave_speeds()
 % test_time_step_and_wave_speeds
 %
-% Tests grid generation, fast magnetosonic speeds, and CFL time step.
+% Tests gridData generation, fast magnetosonic speeds, and CFL time step.
 
 clc;
 
@@ -15,12 +15,12 @@ yMax = 0.5;
 Nx   = 8;
 Ny   = 6;
 
-grid = make_uniform_grid(xMin, xMax, yMin, yMax, Nx, Ny);
+gridData = make_uniform_grid(xMin, xMax, yMin, yMax, Nx, Ny);
 
-assert(abs(grid.dx - (xMax - xMin)/Nx) < 1e-14, 'FAIL: Incorrect dx.');
-assert(abs(grid.dy - (yMax - yMin)/Ny) < 1e-14, 'FAIL: Incorrect dy.');
-assert(isequal(size(grid.Xc), [Ny, Nx]), 'FAIL: Incorrect Xc size.');
-assert(isequal(size(grid.Yc), [Ny, Nx]), 'FAIL: Incorrect Yc size.');
+assert(abs(gridData.dx - (xMax - xMin)/Nx) < 1e-14, 'FAIL: Incorrect dx.');
+assert(abs(gridData.dy - (yMax - yMin)/Ny) < 1e-14, 'FAIL: Incorrect dy.');
+assert(isequal(size(gridData.Xc), [Ny, Nx]), 'FAIL: Incorrect Xc size.');
+assert(isequal(size(gridData.Yc), [Ny, Nx]), 'FAIL: Incorrect Yc size.');
 
 nVar = 8;
 V = zeros(Ny, Nx, nVar);
@@ -51,7 +51,7 @@ cfy = fast_magnetosonic_speed_y(U, gamma);
 assert(all(cfx(:) > 0), 'FAIL: cfx is not strictly positive.');
 assert(all(cfy(:) > 0), 'FAIL: cfy is not strictly positive.');
 
-dt = compute_time_step(U, grid, gamma, CFL);
+dt = compute_time_step(U, gridData, gamma, CFL);
 assert(isfinite(dt), 'FAIL: dt is not finite.');
 assert(dt > 0, 'FAIL: dt is not positive.');
 

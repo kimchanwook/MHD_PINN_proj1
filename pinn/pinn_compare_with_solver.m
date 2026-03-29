@@ -1,20 +1,20 @@
-function comparison = pinn_compare_with_solver(net, grid, exact, tEval)
+function comparison = pinn_compare_with_solver(net, gridData, exact, tEval)
 % pinn_compare_with_solver
 %
 % Compares PINN predictions against the analytical Alfvén-wave reference on
-% the solver grid at a selected evaluation time.
+% the solver gridData at a selected evaluation time.
 %
 % INPUTS:
 %   net   - PINN network
-%   grid  - finite-volume grid structure
+%   gridData  - finite-volume gridData structure
 %   exact - exact Alfvén-wave solution structure
 %   tEval - evaluation time
 %
 % OUTPUT:
 %   comparison - structure with predicted and exact line cuts and L2 errors
 
-x = grid.xc(:);
-yMid = mean([grid.yMin, grid.yMax]);
+x = gridData.xc(:);
+yMid = mean([gridData.yMin, gridData.yMax]);
 N = numel(x);
 
 xyt = [x, yMid * ones(N,1), tEval * ones(N,1)];

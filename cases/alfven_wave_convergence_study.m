@@ -1,7 +1,7 @@
 function study = alfven_wave_convergence_study()
 % alfven_wave_convergence_study
 %
-% Runs the Alfv'en-wave verification at multiple grid resolutions and records
+% Runs the Alfv'en-wave verification at multiple gridData resolutions and records
 % the final L2 error, maximum divergence error, and positivity-floor usage.
 
 clc;
@@ -41,11 +41,11 @@ numFloorEvents = zeros(nCases,1);
 for iCase = 1:nCases
     Nx = NxList(iCase);
     Ny = max(8, round(Nx / NyFactor));
-    grid = make_uniform_grid(xMin, xMax, yMin, yMax, Nx, Ny);
-    [U, exact, params] = init_alfven_wave(grid, gamma, caseParams);
+    gridData = make_uniform_grid(xMin, xMax, yMin, yMax, Nx, Ny);
+    [U, exact, params] = init_alfven_wave(gridData, gamma, caseParams);
 
     V0 = conserved_to_primitive(U, gamma);
-    midRow = ceil(grid.Ny / 2);
+    midRow = ceil(gridData.Ny / 2);
     uz_t0 = squeeze(V0(midRow,:,4)).';
 
     t = 0.0;
@@ -54,11 +54,11 @@ for iCase = 1:nCases
     maxSteps = 500000;
 
     while t < finalTime && step < maxSteps
-        dt = compute_time_step(U, grid, gamma, CFL);
+        dt = compute_time_step(U, gridData, gamma, CFL);
         if t + dt > finalTime
             dt = finalTime - t;
         end
-        [U, stepInfo] = update_fv_rk2_plm(U, grid, gamma, dt, positivity);
+        [U, stepInfo] = update_fv_rk2_plm(U, gridData, gamma, dt, positivity);
         if stepInfo.floorApplied
             numFloorEvents(iCase) = numFloorEvents(iCase) + 1;
         end
@@ -69,15 +69,15 @@ for iCase = 1:nCases
     Vfinal = conserved_to_primitive(U, gamma);
     uz_final = squeeze(Vfinal(midRow,:,4)).';
     Bz_final = squeeze(Vfinal(midRow,:,8)).';
-    uz_exact = exact.uz(grid.xc(:), t);
-    Bz_exact = exact.Bz(grid.xc(:), t);
-    divB = compute_divB(U, grid);
+    uz_exact = exact.uz(gridData.xc(:), t);
+    Bz_exact = exact.Bz(gridData.xc(:), t);
+    divB = compute_divB(U, gridData);
 
     errUz(iCase) = compute_l2_error(uz_final, uz_exact);
     errBz(iCase) = compute_l2_error(Bz_final, Bz_exact);
     maxDivB(iCase) = max(abs(divB(:)));
-    dxVals(iCase) = grid.dx;
-    measuredSpeed(iCase) = measure_alfven_phase_speed(grid.xc, uz_t0, uz_final, t);
+    dxVals(iCase) = gridData.dx;
+    measuredSpeed(iCase) = measure_alfven_phase_speed(gridData.xc, uz_t0, uz_final, t);
 end
 
 fig1 = figure('Visible','off');
@@ -88,7 +88,7 @@ hold off;
 set(gca,'XDir','reverse');
 xlabel('dx'); ylabel('L2 error');
 title('Alfven-wave convergence study');
-legend('Location','best'); grid on;
+legend('Location','best'); gridData on;
 saveas(fig1, fullfile(outDir, 'alfven_convergence.png'));
 close(fig1);
 
@@ -96,7 +96,7 @@ fig2 = figure('Visible','off');
 loglog(dxVals, maxDivB, 'o-', 'LineWidth', 1.5);
 set(gca,'XDir','reverse');
 xlabel('dx'); ylabel('max |div B|');
-title('Divergence error versus grid spacing');
+title('Divergence error versus gridData spacing');
 grid on;
 saveas(fig2, fullfile(outDir, 'alfven_divB_convergence.png'));
 close(fig2);

@@ -19,11 +19,11 @@ if ~exist(params.outputDir, 'dir')
     mkdir(params.outputDir);
 end
 
-grid = make_uniform_grid(0.0, 1.0, 0.0, 1.0, 128, 32);
+gridData = make_uniform_grid(0.0, 1.0, 0.0, 1.0, 128, 32);
 caseParams = struct('rho0', 1.0, 'p0', 1.0, 'B0', 1.0, 'A', 1.0e-3, 'mode', 1);
-[~, exact, solverParams] = init_alfven_wave(grid, gamma, caseParams);
+[~, exact, solverParams] = init_alfven_wave(gridData, gamma, caseParams);
 
-samples = pinn_sample_collocation_points(grid, 0.0, solverParams.period, params);
+samples = pinn_sample_collocation_points(gridData, 0.0, solverParams.period, params);
 targets = pinn_apply_ic_bc(samples, exact);
 net = pinn_build_network(params);
 
@@ -34,7 +34,7 @@ trainResults = pinn_train_alfven(net, samples, targets, params);
 trainedNet = trainResults.net;
 
 comparison = pinn_compare_with_solver( ...
-    trainedNet, grid, exact, params.evalTimeFraction * solverParams.period);
+    trainedNet, gridData, exact, params.evalTimeFraction * solverParams.period);
 
 if params.makePlots
     pinn_plot_training_history(trainResults.history, params.outputDir);
@@ -71,7 +71,7 @@ fprintf('PINN L2 error in B_z: %.4e\n', comparison.errBzL2);
 
 pinnResults = struct();
 pinnResults.params = params;
-pinnResults.grid = grid;
+pinnResults.gridData = gridData;
 pinnResults.solverParams = solverParams;
 pinnResults.samples = samples;
 pinnResults.targets = targets;

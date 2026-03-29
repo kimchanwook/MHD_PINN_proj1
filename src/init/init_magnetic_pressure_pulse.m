@@ -1,4 +1,4 @@
-function [U0, params] = init_magnetic_pressure_pulse(grid, gamma, userParams)
+function [U0, params] = init_magnetic_pressure_pulse(gridData, gamma, userParams)
 % init_magnetic_pressure_pulse
 %
 % Initializes a localized magnetic-pressure pulse on a uniform plasma
@@ -7,7 +7,7 @@ function [U0, params] = init_magnetic_pressure_pulse(grid, gamma, userParams)
 % center.
 %
 % INPUTS:
-%   grid       - grid structure from make_uniform_grid
+%   gridData       - gridData structure from make_uniform_grid
 %   gamma      - ratio of specific heats
 %   userParams - structure with fields:
 %       rho0   - background mass density
@@ -32,12 +32,12 @@ sigma = userParams.sigma;
 x0    = userParams.x0;
 y0    = userParams.y0;
 
-Ny = grid.Ny;
-Nx = grid.Nx;
+Ny = gridData.Ny;
+Nx = gridData.Nx;
 nVar = 8;
 
-X = grid.Xc;
-Y = grid.Yc;
+X = gridData.Xc;
+Y = gridData.Yc;
 R2 = (X - x0).^2 + (Y - y0).^2;
 
 V0 = zeros(Ny, Nx, nVar);

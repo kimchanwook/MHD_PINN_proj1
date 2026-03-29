@@ -1,11 +1,11 @@
-function [divB, maxAbsDivB, rmsDivB] = compute_divB(U, grid)
+function [divB, maxAbsDivB, rmsDivB] = compute_divB(U, gridData)
 % compute_divB
 %
-% Computes the magnetic-field divergence diagnostic on the physical grid.
+% Computes the magnetic-field divergence diagnostic on the physical gridData.
 %
 % INPUTS:
 %   U      - conserved state on physical domain, size [Ny, Nx, 8]
-%   grid   - grid structure from make_uniform_grid
+%   gridData   - gridData structure from make_uniform_grid
 %
 % OUTPUTS:
 %   divB       - discrete divergence of magnetic field on cell centers
@@ -30,8 +30,8 @@ function [divB, maxAbsDivB, rmsDivB] = compute_divB(U, grid)
 Bx = U(:,:,6);
 By = U(:,:,7);
 
-dBx_dx = (circshift(Bx, [0, -1]) - circshift(Bx, [0, 1])) ./ (2 .* grid.dx);
-dBy_dy = (circshift(By, [-1, 0]) - circshift(By, [1, 0])) ./ (2 .* grid.dy);
+dBx_dx = (circshift(Bx, [0, -1]) - circshift(Bx, [0, 1])) ./ (2 .* gridData.dx);
+dBy_dy = (circshift(By, [-1, 0]) - circshift(By, [1, 0])) ./ (2 .* gridData.dy);
 
 divB = dBx_dx + dBy_dy;
 maxAbsDivB = max(abs(divB(:)));

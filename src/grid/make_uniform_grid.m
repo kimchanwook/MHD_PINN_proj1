@@ -1,7 +1,7 @@
-function grid = make_uniform_grid(xMin, xMax, yMin, yMax, Nx, Ny)
+function gridData = make_uniform_grid(xMin, xMax, yMin, yMax, Nx, Ny)
 % make_uniform_grid
 %
-% Creates a uniform 2D Cartesian grid for a finite-volume solver.
+% Creates a uniform 2D Cartesian gridData for a finite-volume solver.
 
 dx = (xMax - xMin) / Nx;
 dy = (yMax - yMin) / Ny;
@@ -14,20 +14,20 @@ yc = yMin + (0.5 : 1 : Ny - 0.5)' * dy;
 xf = xMin + (0 : Nx) * dx;
 yf = (yMin + (0 : Ny) * dy)';
 
-grid = struct();
-grid.xMin = xMin;
-grid.xMax = xMax;
-grid.yMin = yMin;
-grid.yMax = yMax;
-grid.Nx   = Nx;
-grid.Ny   = Ny;
-grid.dx   = dx;
-grid.dy   = dy;
-grid.xc   = xc;
-grid.yc   = yc;
-grid.Xc   = Xc;
-grid.Yc   = Yc;
-grid.xf   = xf;
-grid.yf   = yf;
+gridData = struct();
+gridData.xMin = xMin;
+gridData.xMax = xMax;
+gridData.yMin = yMin;
+gridData.yMax = yMax;
+gridData.Nx   = Nx;
+gridData.Ny   = Ny;
+gridData.dx   = dx;
+gridData.dy   = dy;
+gridData.xc   = xc;
+gridData.yc   = yc;
+gridData.Xc   = Xc;
+gridData.Yc   = Yc;
+gridData.xf   = xf;
+gridData.yf   = yf;
 
 end

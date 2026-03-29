@@ -1,4 +1,4 @@
-function [Unew, stepInfo] = update_fv_rk2_plm(U, grid, gamma, dt, positivity)
+function [Unew, stepInfo] = update_fv_rk2_plm(U, gridData, gamma, dt, positivity)
 % update_fv_rk2_plm
 %
 % Advances the conserved state by one second-order Runge-Kutta step using
@@ -6,7 +6,7 @@ function [Unew, stepInfo] = update_fv_rk2_plm(U, grid, gamma, dt, positivity)
 %
 % INPUTS:
 %   U          - conserved state on physical domain, size [Ny, Nx, 8]
-%   grid       - grid structure
+%   gridData       - gridData structure
 %   gamma      - ratio of specific heats
 %   dt         - time-step size
 %   positivity - optional positivity-floor structure; omit or pass [] to
@@ -20,7 +20,7 @@ if nargin < 5
     positivity = [];
 end
 
-rhs1 = compute_rhs_plm(U, grid, gamma);
+rhs1 = compute_rhs_plm(U, gridData, gamma);
 U1 = U + dt .* rhs1;
 
 stage1FloorInfo = [];
@@ -28,7 +28,7 @@ if ~isempty(positivity) && isfield(positivity, 'isEnabled') && positivity.isEnab
     [U1, stage1FloorInfo] = apply_positivity_floors(U1, gamma, positivity);
 end
 
-rhs2 = compute_rhs_plm(U1, grid, gamma);
+rhs2 = compute_rhs_plm(U1, gridData, gamma);
 Unew = 0.5 .* (U + U1 + dt .* rhs2);
 
 finalFloorInfo = [];

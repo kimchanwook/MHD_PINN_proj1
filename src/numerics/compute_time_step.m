@@ -1,4 +1,4 @@
-function dt = compute_time_step(U, grid, gamma, CFL)
+function dt = compute_time_step(U, gridData, gamma, CFL)
 % compute_time_step
 %
 % Computes the explicit time step for ideal MHD using a CFL condition.
@@ -19,8 +19,8 @@ ay = abs(uy) + cfy;
 max_ax = max(ax(:));
 max_ay = max(ay(:));
 
-dt_x = grid.dx / max_ax;
-dt_y = grid.dy / max_ay;
+dt_x = gridData.dx / max_ax;
+dt_y = gridData.dy / max_ay;
 
 dt = CFL * min(dt_x, dt_y);
 

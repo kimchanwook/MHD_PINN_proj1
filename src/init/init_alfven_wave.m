@@ -1,7 +1,7 @@
-function [U0, exact, params] = init_alfven_wave(grid, gamma, userParams)
+function [U0, exact, params] = init_alfven_wave(gridData, gamma, userParams)
 % init_alfven_wave
 %
-% Initializes a small-amplitude shear Alfvén wave on a 2D grid.
+% Initializes a small-amplitude shear Alfvén wave on a 2D gridData.
 
 rho0 = userParams.rho0;
 p0   = userParams.p0;
@@ -9,17 +9,17 @@ B0   = userParams.B0;
 A    = userParams.A;
 mode = userParams.mode;
 
-Ny = grid.Ny;
-Nx = grid.Nx;
+Ny = gridData.Ny;
+Nx = gridData.Nx;
 nVar = 8;
 
-Lx = grid.xMax - grid.xMin;
+Lx = gridData.xMax - gridData.xMin;
 k  = 2 * pi * mode / Lx;
 vA = B0 / sqrt(rho0);
 lambda = Lx / mode;
 period = lambda / vA;
 
-X = grid.Xc;
+X = gridData.Xc;
 
 V0 = zeros(Ny, Nx, nVar);
 

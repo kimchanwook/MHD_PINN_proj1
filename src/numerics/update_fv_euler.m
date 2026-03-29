@@ -1,4 +1,4 @@
-function [Unew, stepInfo] = update_fv_euler(U, grid, gamma, dt, positivity)
+function [Unew, stepInfo] = update_fv_euler(U, gridData, gamma, dt, positivity)
 % update_fv_euler
 %
 % Advances the conserved state by one forward-Euler time step:
@@ -9,7 +9,7 @@ function [Unew, stepInfo] = update_fv_euler(U, grid, gamma, dt, positivity)
 %
 % INPUTS:
 %   U          - conserved state on physical domain, size [Ny, Nx, 8]
-%   grid       - grid structure
+%   gridData       - gridData structure
 %   gamma      - ratio of specific heats
 %   dt         - time-step size
 %   positivity - optional positivity-floor structure; omit or pass [] to
@@ -23,7 +23,7 @@ if nargin < 5
     positivity = [];
 end
 
-rhs  = compute_rhs(U, grid, gamma);
+rhs  = compute_rhs(U, gridData, gamma);
 Unew = U + dt .* rhs;
 
 stepInfo = struct();

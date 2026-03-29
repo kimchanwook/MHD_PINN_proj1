@@ -21,7 +21,7 @@ xMax = 1.0;
 yMin = 0.0;
 yMax = 1.0;
 
-grid = make_uniform_grid(xMin, xMax, yMin, yMax, Nx, Ny);
+gridData = make_uniform_grid(xMin, xMax, yMin, yMax, Nx, Ny);
 
 caseParams = struct();
 caseParams.rho0  = 1.0;
@@ -38,7 +38,7 @@ if ~exist(outDir, 'dir')
     mkdir(outDir);
 end
 
-[U, params] = init_magnetic_pressure_pulse(grid, gamma, caseParams);
+[U, params] = init_magnetic_pressure_pulse(gridData, gamma, caseParams);
 
 t = 0.0;
 finalTime = 0.2;
@@ -57,15 +57,15 @@ divBmaxHistory = [];
 timeHistory = [];
 
 V = conserved_to_primitive(U, gamma);
-plot_pulse_fields(grid, V, t, outDir, 'pulse_t0');
+plot_pulse_fields(gridData, V, t, outDir, 'pulse_t0');
 
 while t < finalTime && step < maxSteps
-    dt = compute_time_step(U, grid, gamma, CFL);
+    dt = compute_time_step(U, gridData, gamma, CFL);
     if t + dt > finalTime
         dt = finalTime - t;
     end
 
-    [U, stepInfo] = update_fv_rk2_plm(U, grid, gamma, dt, positivity);
+    [U, stepInfo] = update_fv_rk2_plm(U, gridData, gamma, dt, positivity);
     if stepInfo.floorApplied
         numFloorEvents = numFloorEvents + 1;
     end
@@ -81,23 +81,23 @@ while t < finalTime && step < maxSteps
     t = t + dt;
     step = step + 1;
 
-    divB = compute_divB(U, grid);
-    massHistory(end+1,1) = compute_total_mass(U, grid); %#ok<AGROW>
-    energyHistory(end+1,1) = compute_total_energy_domain(U, grid); %#ok<AGROW>
+    divB = compute_divB(U, gridData);
+    massHistory(end+1,1) = compute_total_mass(U, gridData); %#ok<AGROW>
+    energyHistory(end+1,1) = compute_total_energy_domain(U, gridData); %#ok<AGROW>
     divBmaxHistory(end+1,1) = max(abs(divB(:))); %#ok<AGROW>
     timeHistory(end+1,1) = t; %#ok<AGROW>
 
     while sampleIndex <= numel(sampleTimes) && t >= sampleTimes(sampleIndex) - 1e-12
         Vsample = conserved_to_primitive(U, gamma);
         prefix = sprintf('pulse_t%03d', round(1000*sampleTimes(sampleIndex)));
-        plot_pulse_fields(grid, Vsample, t, outDir, prefix);
+        plot_pulse_fields(gridData, Vsample, t, outDir, prefix);
         sampleIndex = sampleIndex + 1;
     end
 end
 
 Vfinal = conserved_to_primitive(U, gamma);
 stateInfo = check_physical_state(U, gamma);
-plot_pulse_fields(grid, Vfinal, t, outDir, 'pulse_final');
+plot_pulse_fields(gridData, Vfinal, t, outDir, 'pulse_final');
 
 fig1 = figure('Visible','off');
 plot(timeHistory, massHistory, 'LineWidth', 1.5);
@@ -181,7 +181,7 @@ fprintf(fid, 'total pressure-floor cells   = %d
 fclose(fid);
 
 results = struct();
-results.grid = grid;
+results.gridData = gridData;
 results.params = params;
 results.positivity = positivity;
 results.tFinal = t;
