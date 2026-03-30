@@ -88,7 +88,7 @@ hold off;
 set(gca,'XDir','reverse');
 xlabel('dx'); ylabel('L2 error');
 title('Alfven-wave convergence study');
-legend('Location','best'); gridData on;
+legend('Location','best'); grid on;
 saveas(fig1, fullfile(outDir, 'alfven_convergence.png'));
 close(fig1);
 
@@ -102,11 +102,9 @@ saveas(fig2, fullfile(outDir, 'alfven_divB_convergence.png'));
 close(fig2);
 
 fid = fopen(fullfile(outDir, 'alfven_convergence_summary.txt'), 'w');
-fprintf(fid, 'Nx    Ny       dx             L2(uz)         L2(Bz)         max|divB|       measured speed   floor events
-');
+fprintf(fid, 'Nx    Ny       dx             L2(uz)         L2(Bz)         max|divB|       measured speed   floor events');
 for iCase = 1:nCases
-    fprintf(fid, '%-5d %-5d %-14.6e %-14.6e %-14.6e %-14.6e %-16.6f %-8d
-', ...
+    fprintf(fid, '%-5d %-5d %-14.6e %-14.6e %-14.6e %-14.6e %-16.6f %-8d', ...
         NxList(iCase), max(8, round(NxList(iCase)/NyFactor)), dxVals(iCase), errUz(iCase), errBz(iCase), maxDivB(iCase), measuredSpeed(iCase), numFloorEvents(iCase));
 end
 fclose(fid);
