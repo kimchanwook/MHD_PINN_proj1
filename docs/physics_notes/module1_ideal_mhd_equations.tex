@@ -20,7 +20,6 @@
 \definecolor{SoftBlue}{HTML}{EAF3F8}
 \definecolor{SoftTeal}{HTML}{EDF8F6}
 \definecolor{SoftGray}{HTML}{F5F7FA}
-\definecolor{RuleGray}{HTML}{D7DEE8}
 
 \pagestyle{fancy}
 \fancyhf{}
@@ -33,45 +32,32 @@
 \titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
 \titleformat{\subsubsection}{\normalsize\bfseries\color{TitleBlue}}{\thesubsubsection}{0.6em}{}
 
-\newtcolorbox{overviewbox}{
-  colback=SoftBlue,
-  colframe=TitleBlue,
-  boxrule=0.8pt,
-  arc=2mm,
-  left=3mm,right=3mm,top=2mm,bottom=2mm
-}
-
-\newtcolorbox{physicsbox}{
-  colback=SoftTeal,
-  colframe=AccentTeal,
-  boxrule=0.8pt,
-  arc=2mm,
-  left=3mm,right=3mm,top=2mm,bottom=2mm
-}
+\newtcolorbox{overviewbox}{colback=SoftBlue,colframe=TitleBlue,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newtcolorbox{physicsbox}{colback=SoftTeal,colframe=AccentTeal,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
 
 \newcommand{\Uvec}{\mathbf{U}}
 \newcommand{\Fvec}{\mathbf{F}}
 \newcommand{\Gvec}{\mathbf{G}}
 \newcommand{\uvec}{\mathbf{u}}
 \newcommand{\Bvec}{\mathbf{B}}
+\newcommand{\Jvec}{\mathbf{J}}
 \newcommand{\ptot}{p_{\mathrm{tot}}}
+\newcommand{\Iten}{\mathbf{I}}
 
 \begin{document}
 
 \begin{center}
-    {\LARGE \bfseries \color{TitleBlue} Module 1 Physics Notes: Ideal Magnetohydrodynamic Equations}\\[0.5em]
-    {\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}\\[0.8em]
-    {\normalsize Purpose: derive the equations used by the conventional MATLAB solver before the PINN stage.}
+{\LARGE \bfseries \color{TitleBlue} Module 1 Physics Notes: Ideal Magnetohydrodynamic Equations}\\[0.5em]
+{\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}\\[0.8em]
+{\normalsize Purpose: derive the equations used by the conventional MATLAB solver before the PINN stage.}
 \end{center}
 
 \vspace{0.5em}
-
 \begin{overviewbox}
-\textbf{Scope of this note.} This file derives the \textbf{ideal magnetohydrodynamic (MHD)} equations in the conservative form used by the two-dimensional finite-volume solver. The note emphasizes physical meaning, not just algebra. Every symbol used in the derivation is defined in the symbol table below.
+\textbf{Scope of this note.} This file derives the ideal magnetohydrodynamic (MHD) equations in the conservative form used by the two-dimensional finite-volume solver. Special attention is given to the momentum equation, because this is where fluid inertia, gas pressure, isotropic magnetic pressure, and directional magnetic tension come together. The notation is kept consistent with the MATLAB code and with the conservative-state vector used by the solver.
 \end{overviewbox}
 
 \section{Symbol and variable table}
-
 \rowcolors{2}{SoftGray}{white}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.18\textwidth} >{\raggedright\arraybackslash}p{0.28\textwidth} >{\raggedright\arraybackslash}p{0.46\textwidth}}
 \toprule
@@ -87,13 +73,15 @@ $p$ & gas pressure & Thermal pressure of the fluid. \\
 $\gamma$ & ratio of specific heats & Closure parameter for an ideal gas, commonly $\gamma=5/3$. \\
 $\uvec=(u_x,u_y,u_z)$ & fluid velocity & Plasma bulk-flow velocity. \\
 $\Bvec=(B_x,B_y,B_z)$ & magnetic field & Magnetic-field vector. \\
+$\Jvec$ & current density & Electric-current density carried by the plasma. \\
 $E$ & total energy density & Sum of internal, kinetic, and magnetic energy densities. \\
 $\ptot$ & total pressure & Sum of gas pressure and magnetic pressure. \\
 $\Uvec$ & conserved-state vector & Vector of conserved variables updated by the finite-volume solver. \\
 $\Fvec$ & $x$-direction flux vector & Flux of conserved quantities through a face normal to the $x$-direction. \\
 $\Gvec$ & $y$-direction flux vector & Flux of conserved quantities through a face normal to the $y$-direction. \\
-$u_x,u_y,u_z$ & velocity components & Components of bulk fluid velocity in the $x$, $y$, and $z$ directions. \\
-$B_x,B_y,B_z$ & magnetic-field components & Components of magnetic field in the $x$, $y$, and $z$ directions. \\
+$\Iten$ & identity tensor & Tensor that leaves vectors unchanged under multiplication. \\
+$\uvec\uvec$ & dyadic product of velocity & Rank-2 tensor with components $(u_i u_j)$. \\
+$\Bvec\Bvec$ & dyadic product of field & Rank-2 tensor with components $(B_i B_j)$. \\
 $\uvec\cdot\Bvec$ & velocity--field dot product & Measures how much the flow is aligned with the magnetic field. \\
 $\nabla\cdot\Bvec$ & magnetic divergence & Must be zero in ideal MHD because magnetic monopoles are not observed. \\
 $x,y,t$ & coordinates and time & Two spatial coordinates and time variable used by the solver. \\
@@ -101,20 +89,15 @@ $x,y,t$ & coordinates and time & Two spatial coordinates and time variable used 
 \end{longtable}
 
 \section{Why magnetohydrodynamics is the right model here}
-
 \subsection{From particle motion to fluid fields}
-A plasma is a gas made of charged particles. In principle, one could follow every ion and electron individually, but that is usually far too expensive and also unnecessary when the physical scales of interest are much larger than microscopic particle orbits. Magnetohydrodynamics replaces the enormous collection of particles with smooth continuum fields such as density, velocity, pressure, and magnetic field.
-
-The central physical assumption is that, on scales large compared with microscopic kinetic lengths, the plasma behaves like a conducting fluid. The fluid carries momentum and internal energy, while the magnetic field stores energy and exerts stress on the fluid.
+A plasma is a gas made of charged particles. In principle, one could follow every ion and electron individually, but that is usually far too expensive and also unnecessary when the physical scales of interest are much larger than microscopic particle orbits. Magnetohydrodynamics replaces the enormous collection of particles with smooth continuum fields such as density, velocity, pressure, and magnetic field. The central physical assumption is that, on scales large compared with microscopic kinetic lengths, the plasma behaves like a conducting fluid.
 
 \begin{physicsbox}
-\textbf{Physical picture.} Ordinary gas dynamics is a fluid pushed by pressure gradients and inertia. MHD is a fluid pushed by pressure gradients, inertia, and magnetic stresses. The magnetic field behaves partly like a pressure and partly like a tension-bearing elastic structure.
+\textbf{Physical picture.} Ordinary gas dynamics is a fluid pushed by pressure gradients and inertia. MHD is a fluid pushed by pressure gradients, inertia, and magnetic stresses. The magnetic field behaves partly like an isotropic pressure and partly like a tension-bearing elastic structure.
 \end{physicsbox}
 
 \subsection{Why the equations are written in conservative form}
 The numerical method used in the project is a finite-volume method. A finite-volume method evolves averages of conserved quantities inside computational cells. For that reason, the governing equations are written in a conservative balance-law form: the time change inside a cell equals the net flux through the cell boundaries.
-
-That is why the variables updated numerically are not $u_x,u_y,u_z$ directly, but the conserved densities $\rho u_x$, $\rho u_y$, $\rho u_z$, and the total energy density $E$.
 
 \section{The conserved-state vector}
 The solver uses the conserved variable vector
@@ -132,7 +115,6 @@ B_z
 \end{bmatrix}.
 \label{eq:Uvec}
 \end{equation}
-
 Each component of \eqref{eq:Uvec} has a direct physical meaning:
 \begin{itemize}[leftmargin=1.8em]
     \item $\rho$ is the amount of mass per unit volume.
@@ -141,44 +123,13 @@ Each component of \eqref{eq:Uvec} has a direct physical meaning:
     \item $B_x$, $B_y$, and $B_z$ are stored as part of the state because the magnetic field evolves dynamically.
 \end{itemize}
 
-\subsection{Why the magnetic field appears in the state vector}
-In MHD the magnetic field is not imposed from the outside as a fixed background. It evolves along with the plasma. That is why the induction equation must be solved together with the fluid equations. Numerically, that means the magnetic-field components must be advanced in time just like the density, momentum, and total energy.
-
 \section{Derivation of the total energy density}
 The total energy density in ideal MHD is
 \begin{equation}
 E = \frac{p}{\gamma-1} + \frac{1}{2}\rho\left(u_x^2+u_y^2+u_z^2\right) + \frac{1}{2}\left(B_x^2+B_y^2+B_z^2\right).
 \label{eq:total-energy}
 \end{equation}
-We now derive each term.
-
-\subsection{Internal energy term}
-For an ideal gas, the internal energy density is
-\begin{equation}
-e_{\mathrm{int}} = \frac{p}{\gamma-1}.
-\end{equation}
-This relation is the ideal-gas closure used by the solver. It converts pressure into internal thermal energy density.
-
-\subsection{Kinetic energy term}
-The kinetic energy per unit volume is mass density times kinetic energy per unit mass:
-\begin{equation}
-e_{\mathrm{kin}} = \rho \left(\frac{1}{2}\abs{\uvec}^2\right)=\frac{1}{2}\rho\left(u_x^2+u_y^2+u_z^2\right).
-\end{equation}
-
-\subsection{Magnetic energy term}
-In normalized ideal MHD units, the magnetic energy density is
-\begin{equation}
-e_{\mathrm{mag}} = \frac{1}{2}\abs{\Bvec}^2 = \frac{1}{2}\left(B_x^2+B_y^2+B_z^2\right).
-\end{equation}
-
-\subsection{Why these three terms add}
-The plasma can store energy in three physically distinct ways:
-\begin{enumerate}[leftmargin=1.8em]
-    \item thermal disorder of particles, represented by the internal energy,
-    \item bulk organized motion of the fluid, represented by kinetic energy,
-    \item the electromagnetic field, represented here by magnetic energy.
-\end{enumerate}
-Ideal MHD treats these as interconvertible forms of energy. For example, a compressed magnetic field can accelerate the fluid, or kinetic motion can bend field lines and increase magnetic energy.
+The three pieces are internal energy, kinetic energy, and magnetic energy. In normalized ideal-MHD units, the magnetic energy density is $\frac12 |\Bvec|^2$.
 
 \section{Derivation of the conservative equations}
 The ideal MHD equations used in the solver are
@@ -192,30 +143,161 @@ This compact vector equation really contains eight coupled scalar equations. We 
 Mass conservation states that matter is not created or destroyed inside the fluid element. In differential form,
 \begin{equation}
 \pdv{\rho}{t} + \nabla\cdot(\rho\uvec)=0.
+\label{eq:mass}
 \end{equation}
 In two-dimensional Cartesian form,
 \begin{equation}
 \pdv{\rho}{t} + \pdv{}{x}(\rho u_x) + \pdv{}{y}(\rho u_y)=0.
+\label{eq:mass2d}
 \end{equation}
-The first component of the flux vectors must therefore be the mass fluxes $\rho u_x$ and $\rho u_y$.
 
 \subsection{Momentum conservation and the role of magnetic stress}
-If there were no magnetic field, the momentum equation would be the Euler equation of compressible gas dynamics. MHD adds magnetic stress. The momentum balance can be written as
-\begin{equation}
-\pdv{}{t}(\rho\uvec) + \nabla\cdot\left[\rho\uvec\uvec + \left(p+\frac{1}{2}\abs{\Bvec}^2\right)\mathbf{I} - \Bvec\Bvec\right]=0,
-\label{eq:momentum-tensor}
-\end{equation}
-where $\mathbf{I}$ is the identity tensor.
+If there were no magnetic field, the momentum equation would be the Euler equation of compressible gas dynamics. MHD adds the Lorentz force density $\Jvec\times\Bvec$.
 
-Equation \eqref{eq:momentum-tensor} is extremely important because it shows that the magnetic field enters in two distinct ways:
-\begin{enumerate}[leftmargin=1.8em]
-    \item through an isotropic magnetic-pressure term $\frac{1}{2}\abs{\Bvec}^2\mathbf{I}$,
-    \item through a directional tension term $-\Bvec\Bvec$.
-\end{enumerate}
+\subsubsection{Step 1: Euler equation of compressible gas dynamics}
+For a neutral compressible fluid with no magnetic field, Newton's second law per unit volume gives
+\begin{equation}
+\rho\,\frac{D\uvec}{Dt} = -\nabla p,
+\label{eq:euler-lagrangian}
+\end{equation}
+where $D/Dt = \partial/\partial t + \uvec\cdot\nabla$ is the material derivative. Equation \eqref{eq:euler-lagrangian} says: the fluid accelerates when pressure is higher on one side than the other.
+
+To convert this into conservative form, use the continuity equation. The standard identity is
+\begin{equation}
+\pdv{}{t}(\rho\uvec) + \nabla\cdot(\rho\uvec\uvec)
+= \rho\,\frac{D\uvec}{Dt}.
+\label{eq:mom-identity}
+\end{equation}
+Substituting \eqref{eq:euler-lagrangian} into \eqref{eq:mom-identity} gives the compressible Euler momentum equation,
+\begin{equation}
+\pdv{}{t}(\rho\uvec) + \nabla\cdot(\rho\uvec\uvec) = -\nabla p.
+\label{eq:euler-precons}
+\end{equation}
+Now rewrite $-\nabla p$ as the divergence of an isotropic stress tensor:
+\begin{equation}
+-\nabla p = -\nabla\cdot(p\Iten),
+\label{eq:pressure-tensor-form}
+\end{equation}
+because $\nabla\cdot(p\Iten)$ has components $\partial_j(p\delta_{ij}) = \partial_i p$. Therefore,
+\begin{equation}
+\pdv{}{t}(\rho\uvec) + \nabla\cdot\left[\rho\uvec\uvec + p\Iten\right] = 0.
+\label{eq:euler-cons}
+\end{equation}
+Equation \eqref{eq:euler-cons} is the Euler equation of compressible gas dynamics written as a conservation law.
+
+\subsubsection{Step 2: add the Lorentz force}
+In MHD the fluid is electrically conducting, so it feels the magnetic force density
+\begin{equation}
+\mathbf{f}_{B}=\Jvec\times\Bvec.
+\label{eq:lorentz-density}
+\end{equation}
+The momentum equation becomes
+\begin{equation}
+\pdv{}{t}(\rho\uvec) + \nabla\cdot\left[\rho\uvec\uvec + p\Iten\right] = \Jvec\times\Bvec.
+\label{eq:mhd-mom-with-lorentz}
+\end{equation}
+To put this in conservative form, we want to rewrite $\Jvec\times\Bvec$ as the divergence of a tensor.
+
+\subsubsection{Step 3: express $\Jvec\times\Bvec$ in terms of $\Bvec$}
+In the normalized units used by ideal MHD, Ampere's law is
+\begin{equation}
+\Jvec = \nabla\times\Bvec.
+\label{eq:ampere}
+\end{equation}
+Therefore,
+\begin{equation}
+\Jvec\times\Bvec = (\nabla\times\Bvec)\times\Bvec.
+\label{eq:lorentz-as-B}
+\end{equation}
+Now use the vector identity
+\begin{equation}
+(\nabla\times\Bvec)\times\Bvec
+= (\Bvec\cdot\nabla)\Bvec - \nabla\left(\frac{1}{2}|\Bvec|^2\right) + \Bvec(\nabla\cdot\Bvec).
+\label{eq:lorentz-identity}
+\end{equation}
+In ideal MHD we impose the divergence-free constraint
+\begin{equation}
+\nabla\cdot\Bvec = 0,
+\label{eq:divB0}
+\end{equation}
+so \eqref{eq:lorentz-identity} reduces to
+\begin{equation}
+\Jvec\times\Bvec = (\Bvec\cdot\nabla)\Bvec - \nabla\left(\frac{1}{2}|\Bvec|^2\right).
+\label{eq:lorentz-pressure-tension}
+\end{equation}
+This is the most important physical decomposition in the momentum equation.
 
 \begin{physicsbox}
-\textbf{Interpretation of magnetic stress.} Magnetic pressure tries to push outward from regions of strong magnetic field. Magnetic tension tries to straighten bent field lines, much like tension in a stretched string. MHD dynamics arises from the competition between fluid inertia, gas pressure, magnetic pressure, and magnetic tension.
+\textbf{Meaning of the two magnetic terms.}
+\begin{itemize}[leftmargin=1.8em]
+    \item $-\nabla(\frac12 |\Bvec|^2)$ is an \textbf{isotropic magnetic-pressure force}. It pushes away from regions where magnetic-field strength is large.
+    \item $(\Bvec\cdot\nabla)\Bvec$ is a \textbf{directional magnetic-tension force}. It acts along field lines and tends to straighten them when they are bent.
+\end{itemize}
+So magnetic stress is not purely pressure-like. It has both an isotropic part and an anisotropic part.
 \end{physicsbox}
+
+\subsubsection{Step 4: write the magnetic force as a divergence}
+We now show how \eqref{eq:lorentz-pressure-tension} becomes a flux divergence. First note that
+\begin{equation}
+\nabla\cdot\left(\frac12 |\Bvec|^2\Iten\right) = \nabla\left(\frac12 |\Bvec|^2\right).
+\label{eq:isotropic-div}
+\end{equation}
+Next consider the dyadic tensor $\Bvec\Bvec$, whose divergence has components
+\begin{equation}
+\left[\nabla\cdot(\Bvec\Bvec)\right]_i
+= \partial_j(B_i B_j)
+= B_j\partial_j B_i + B_i\partial_j B_j.
+\label{eq:BB-div-components}
+\end{equation}
+Using index notation, this is
+\begin{equation}
+\nabla\cdot(\Bvec\Bvec) = (\Bvec\cdot\nabla)\Bvec + \Bvec(\nabla\cdot\Bvec).
+\label{eq:BB-div}
+\end{equation}
+When $\nabla\cdot\Bvec=0$, this simplifies to
+\begin{equation}
+\nabla\cdot(\Bvec\Bvec) = (\Bvec\cdot\nabla)\Bvec.
+\label{eq:BB-div-simplified}
+\end{equation}
+Substitute \eqref{eq:isotropic-div} and \eqref{eq:BB-div-simplified} into \eqref{eq:lorentz-pressure-tension}. Then
+\begin{equation}
+\Jvec\times\Bvec
+= -\nabla\cdot\left[\frac12 |\Bvec|^2\Iten - \Bvec\Bvec\right].
+\label{eq:lorentz-stress-form}
+\end{equation}
+This tensor is the magnetic part of the stress tensor.
+
+\subsubsection{Step 5: final conservative momentum equation}
+Insert \eqref{eq:lorentz-stress-form} into \eqref{eq:mhd-mom-with-lorentz}. The result is
+\begin{equation}
+\pdv{}{t}(\rho\uvec)
++ \nabla\cdot\left[\rho\uvec\uvec + p\Iten + \frac12 |\Bvec|^2\Iten - \Bvec\Bvec\right] = 0.
+\label{eq:momentum-expanded}
+\end{equation}
+Grouping the two isotropic pieces gives
+\begin{equation}
+\pdv{}{t}(\rho\uvec)
++ \nabla\cdot\left[\rho\uvec\uvec + \left(p+\frac12 |\Bvec|^2\right)\Iten - \Bvec\Bvec\right] = 0.
+\label{eq:momentum-tensor}
+\end{equation}
+Equation \eqref{eq:momentum-tensor} is the corrected form used by the solver. The quantity inside the time derivative is the \textbf{momentum density} $\rho\uvec$, not just the velocity $\uvec$.
+
+\subsubsection{Component view in two dimensions}
+For the $x$-momentum equation,
+\begin{equation}
+\pdv{}{t}(\rho u_x)
++ \pdv{}{x}\left(\rho u_x^2 + p + \frac12 |\Bvec|^2 - B_x^2\right)
++ \pdv{}{y}\left(\rho u_x u_y - B_x B_y\right) = 0.
+\label{eq:xmom2d}
+\end{equation}
+For the $y$-momentum equation,
+\begin{equation}
+\pdv{}{t}(\rho u_y)
++ \pdv{}{x}\left(\rho u_y u_x - B_y B_x\right)
++ \pdv{}{y}\left(\rho u_y^2 + p + \frac12 |\Bvec|^2 - B_y^2\right) = 0.
+\label{eq:ymom2d}
+\end{equation}
+These are exactly the forms that later appear inside the flux vectors used by the MATLAB code.
 
 \subsection{Energy conservation}
 The energy equation in conservative form is
@@ -225,11 +307,10 @@ The energy equation in conservative form is
 \end{equation}
 where
 \begin{equation}
-\ptot = p + \frac{1}{2}\abs{\Bvec}^2.
+\ptot = p + \frac{1}{2}|\Bvec|^2.
 \label{eq:ptot}
 \end{equation}
-
-The first term inside the energy flux, $(E+\ptot)\uvec$, resembles the usual fluid-energy advection term but with total pressure instead of only gas pressure. The second term, $(\uvec\cdot\Bvec)\Bvec$, accounts for the part of electromagnetic energy transport coupled to the direction of the field.
+The first term inside the energy flux, $(E+\ptot)\uvec$, resembles the usual fluid-energy advection term but with total pressure instead of only gas pressure. The second term, $(\uvec\cdot\Bvec)\Bvec$, accounts for electromagnetic energy transport along the magnetic field.
 
 \subsection{Induction equation}
 The induction equation for ideal MHD is
@@ -237,7 +318,7 @@ The induction equation for ideal MHD is
 \pdv{\Bvec}{t} - \nabla\times(\uvec\times\Bvec)=0.
 \label{eq:induction-curl}
 \end{equation}
-Using vector identities and the divergence-free condition $\nabla\cdot\Bvec=0$, this can be written in conservative component form. In the two-dimensional solver, the magnetic-field fluxes are represented directly in the $\Fvec$ and $\Gvec$ vectors.
+Using vector identities and the divergence-free condition $\nabla\cdot\Bvec=0$, this can be written in conservative component form.
 
 \subsection{Divergence-free constraint}
 An additional constraint must hold:
@@ -248,8 +329,9 @@ An additional constraint must hold:
 In two dimensions this becomes
 \begin{equation}
 \pdv{B_x}{x} + \pdv{B_y}{y} = 0.
+\label{eq:divB-2d}
 \end{equation}
-This is not an optional detail. It expresses the empirical absence of magnetic monopoles. Numerically, if this constraint is violated too strongly, the solver can produce unphysical forces. That is why the project includes a diagnostic $\nabla\cdot\Bvec$ monitor even before more advanced divergence-control methods are added.
+This is not an optional detail. It expresses the empirical absence of magnetic monopoles. Numerically, if this constraint is violated too strongly, the solver can produce unphysical forces.
 
 \section{Flux vectors used by the MATLAB code}
 Using the definitions above, the $x$-direction flux vector is
@@ -267,7 +349,6 @@ u_x B_z - u_z B_x
 \end{bmatrix}.
 \label{eq:Fx}
 \end{equation}
-
 The $y$-direction flux vector is
 \begin{equation}
 \Gvec =
@@ -284,59 +365,16 @@ u_y B_z - u_z B_y
 \label{eq:Gy}
 \end{equation}
 
-\subsection{Why the $B_x$ flux in $x$ is zero, and the $B_y$ flux in $y$ is zero}
-The MATLAB tests check that the sixth component of $\Fvec$ is zero and the seventh component of $\Gvec$ is zero. This is not arbitrary. Those zeros are built into the induction equation when written in conservative Cartesian form. They are a useful structural consistency check because a coding mistake in the magnetic flux terms often shows up immediately in these entries.
-
-\section{Primitive and conserved variables}
-The solver moves back and forth between two representations:
-\begin{align}
-\text{primitive variables: } & (\rho, u_x, u_y, u_z, p, B_x, B_y, B_z), \\
-\text{conserved variables: } & (\rho, \rho u_x, \rho u_y, \rho u_z, E, B_x, B_y, B_z).
-\end{align}
-
-\subsection{Why primitive variables are useful}
-Primitive variables are the natural variables for physical interpretation and for initializing test problems. For example, it is far easier to specify an Alfvén-wave perturbation in terms of $u_z$ and $B_z$ than in terms of total energy density.
-
-\subsection{Why conserved variables are useful}
-Finite-volume methods update cell averages of conserved densities. That is why the numerical solver evolves the conserved state vector $\Uvec$.
-
-\subsection{Recovering pressure from the conserved state}
-The pressure-recovery formula used by the MATLAB code comes directly from solving \eqref{eq:total-energy} for $p$:
-\begin{equation}
-p = (\gamma-1)\left[E - \frac{1}{2}\rho\left(u_x^2+u_y^2+u_z^2\right) - \frac{1}{2}\left(B_x^2+B_y^2+B_z^2\right)\right].
-\label{eq:pressure-recovery}
-\end{equation}
-This is an important formula because any numerical error in total energy immediately affects the recovered pressure.
-
-\section{Why these equations are appropriate for the first solver stage}
-For the first solver stage, the goal is to verify wave propagation and then demonstrate a nonlinear magnetic-pressure pulse. Ideal MHD is the right starting point because it captures the key coupling between the plasma flow and the magnetic field while keeping the system manageable enough to implement and verify in MATLAB.
-
-The following effects are intentionally excluded at this stage:
-\begin{itemize}[leftmargin=1.8em]
-    \item resistivity,
-    \item viscosity,
-    \item thermal conduction,
-    \item Hall terms,
-    \item kinetic particle effects.
-\end{itemize}
-Those may matter in more advanced plasma models, but omitting them here is scientifically reasonable because the first objective is to construct a clean baseline solver whose behavior can be understood and verified.
-
-\section{Connection to the Alfvén-wave verification case}
-The first verification case in the project is a small-amplitude shear Alfvén wave. That test is ideal because it checks whether the code correctly transmits coupled perturbations in transverse velocity and magnetic field at the expected Alfvén speed. In other words, it directly tests whether the momentum equation, induction equation, and magnetic stresses have been implemented consistently.
-
-\begin{overviewbox}
-\textbf{Practical solver takeaway.} The MATLAB files \texttt{primitive\_to\_conserved.m}, \texttt{conserved\_to\_primitive.m}, \texttt{compute\_pressure.m}, \texttt{compute\_total\_energy.m}, \texttt{flux\_x.m}, and \texttt{flux\_y.m} are direct numerical realizations of the physics derived in this note. The solver is not just ``doing numerics''; it is advancing the exact conservative balances derived above.
-\end{overviewbox}
-
 \section{Summary}
-The core ideas of this note are:
+The conservative ideal-MHD momentum equation can look opaque when written as a compact tensor divergence, but its logic is straightforward:
 \begin{enumerate}[leftmargin=1.8em]
-    \item MHD treats a conducting plasma as a continuum fluid coupled to a magnetic field.
-    \item The finite-volume solver evolves conserved quantities, so the governing equations must be written in conservative form.
-    \item The total energy density contains internal, kinetic, and magnetic contributions.
-    \item Magnetic fields affect momentum through both pressure-like and tension-like stresses.
-    \item The divergence-free condition $\nabla\cdot\Bvec=0$ is physically essential and numerically important.
-    \item The flux vectors used in the MATLAB code follow directly from the conservative ideal-MHD equations.
+    \item start from Newton's second law for a compressible fluid,
+    \item write the gas-dynamic part in conservative Euler form,
+    \item add the Lorentz force density $\Jvec\times\Bvec$,
+    \item use Ampere's law and the identity for $(\nabla\times\Bvec)\times\Bvec$,
+    \item separate the magnetic force into isotropic magnetic pressure and directional magnetic tension,
+    \item rewrite those terms as the divergence of a stress tensor.
 \end{enumerate}
+That derivation produces the same conservative momentum fluxes that appear later in the MATLAB implementation.
 
 \end{document}
