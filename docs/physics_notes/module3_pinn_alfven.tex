@@ -1,56 +1,75 @@
 \documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage{microtype}
 \usepackage[table]{xcolor}
-\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{amsmath,amssymb,amsfonts,mathtools,bm}
 \usepackage{physics}
-\usepackage{booktabs,array,longtable,tabularx}
-\usepackage{hyperref}
+\usepackage{booktabs,longtable,array}
 \usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage[most]{tcolorbox}
 \usepackage{fancyhdr}
+\usepackage{lastpage}
 \usepackage{titlesec}
-\usepackage{tcolorbox}
-\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+\usepackage{mathrsfs}
 
-\definecolor{TitleBlue}{HTML}{163A5F}
-\definecolor{AccentTeal}{HTML}{2D6F73}
-\definecolor{SoftBlue}{HTML}{EAF3F8}
-\definecolor{SoftTeal}{HTML}{EDF8F6}
-\definecolor{SoftGray}{HTML}{F5F7FA}
+\definecolor{Navy}{HTML}{1F3A5F}
+\definecolor{SoftBlue}{HTML}{EAF2F8}
+\definecolor{SoftGray}{HTML}{F7F9FA}
+\definecolor{RuleGray}{HTML}{D6DBDF}
 
 \pagestyle{fancy}
 \fancyhf{}
-\lhead{PINN for Two-Dimensional MHD Evolution}
+\lhead{MHD\_PINN\_proj1}
 \rhead{Module 3 Physics Notes}
-\cfoot{\thepage}
+\cfoot{\thepage\ of \pageref{LastPage}}
 \setlength{\headheight}{14pt}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
 
-\titleformat{\section}{\Large\bfseries\color{TitleBlue}}{\thesection}{0.6em}{}
-\titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
-\titleformat{\subsubsection}{\normalsize\bfseries\color{TitleBlue}}{\thesubsubsection}{0.6em}{}
+\titleformat{\section}{\large\bfseries\color{Navy}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{Navy}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
 
-\newtcolorbox{overviewbox}{colback=SoftBlue,colframe=TitleBlue,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
-\newtcolorbox{physicsbox}{colback=SoftTeal,colframe=AccentTeal,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newcommand{\uvec}{\mathbf{u}}
+\newcommand{\Bvec}{\mathbf{B}}
+\newcommand{\xvec}{\mathbf{x}}
+\newcommand{\zhat}{\hat{\mathbf{z}}}
+
+\newtcolorbox{overviewbox}{
+  colback=SoftBlue,
+  colframe=Navy,
+  boxrule=0.7pt,
+  arc=2pt,
+  left=8pt,right=8pt,top=8pt,bottom=8pt
+}
+\newtcolorbox{physicsbox}{
+  colback=SoftGray,
+  colframe=RuleGray,
+  boxrule=0.5pt,
+  arc=2pt,
+  left=8pt,right=8pt,top=8pt,bottom=8pt
+}
 
 \begin{document}
 
 \begin{center}
-    {\LARGE \bfseries \color{TitleBlue} Module 3 Physics Notes: PINN Formulation for the Alfv\'en-Wave Benchmark}\\[0.5em]
-    {\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}\\[0.8em]
-    {\normalsize Purpose: derive the first executable PINN used in the project and explain exactly what physics it enforces.}
+    {\LARGE\bfseries Module 3: PINN Formulation for the Alfv\'en-Wave Benchmark}\\[0.6em]
+    {\large MHD\_PINN\_proj1 Physics Notes}\\[0.4em]
+    {\normalsize Revised to derive the reduced benchmark PINN step by step}
 \end{center}
 
-\vspace{0.5em}
+\vspace{0.8em}
 
 \begin{overviewbox}
-\textbf{Scope of this note.} This file explains the first executable \textbf{physics-informed neural network (PINN)} stage for the project. The note is deliberately explicit about what is and is not being enforced. The network is trained on the Alfv\'en-wave verification case using a reduced residual system derived from the ideal \textbf{magnetohydrodynamic (MHD)} equations. This makes the first PINN scientifically honest and technically manageable before moving to a fully general two-dimensional MHD PINN.
+These notes explain the first executable physics-informed neural network (PINN) stage in the project.
+The goal is not to pretend that the network already solves fully general two-dimensional ideal MHD. The goal is to build the first PINN honestly from a reduced subsystem that is still physically meaningful, analytically understood, and trainable.
+The benchmark used for that purpose is the same small-amplitude Alfv\'en-wave problem introduced in Module~2.
 \end{overviewbox}
 
 \section{Symbol and variable table}
-
 \rowcolors{2}{SoftGray}{white}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.18\textwidth} >{\raggedright\arraybackslash}p{0.28\textwidth} >{\raggedright\arraybackslash}p{0.46\textwidth}}
 \toprule
@@ -61,187 +80,335 @@
 \textbf{Symbol} & \textbf{Name} & \textbf{Meaning} \\
 \midrule
 \endhead
-$x,y,t$ & coordinates and time & Two spatial coordinates and time. The Alfv\'en benchmark depends on $x$ and $t$ and is uniform in $y$. \\
-$\rho$ & mass density & Plasma mass density. In the benchmark it stays near a constant background value. \\
-$u_x,u_y,u_z$ & velocity components & Bulk velocity components. The Alfv\'en benchmark evolves mainly through $u_z$. \\
-$p$ & gas pressure & Thermal pressure. In the benchmark it remains at the background value $p_0$. \\
-$B_x,B_y,B_z$ & magnetic-field components & Magnetic-field components. The benchmark evolves mainly through $B_z$ with constant background $B_x=B_0$. \\
-$\rho_0$ & background mass density & Uniform density of the equilibrium state. \\
-$p_0$ & background gas pressure & Uniform pressure of the equilibrium state. \\
-$B_0$ & background magnetic field & Constant background field in the $x$-direction. \\
-$v_A$ & Alfv\'en speed & Characteristic propagation speed, $v_A=B_0/\sqrt{\rho_0}$ in normalized units. \\
-$A$ & perturbation amplitude & Small initial amplitude of the transverse Alfv\'en perturbation. \\
-$k$ & wave number & Spatial frequency of the sinusoidal wave. \\
-$\mathcal{N}_{\theta}$ & neural network & Neural network with trainable parameter set $\theta$. \\
-$\mathcal{L}_{\mathrm{IC}}$ & initial-condition loss & Penalizes mismatch at $t=0$. \\
-$\mathcal{L}_{\mathrm{BC}}$ & boundary-condition loss & Penalizes mismatch between periodic left and right boundaries. \\
-$\mathcal{L}_{\mathrm{PDE}}$ & reduced PDE loss & Penalizes violation of the reduced Alfv\'en dynamics. \\
-$\mathcal{L}_{y}$ & y-uniformity loss & Penalizes dependence on $y$ for the benchmark solution. \\
-$\mathcal{L}_{\mathrm{bg}}$ & background-state loss & Penalizes drift of quantities that should remain at their background values. \\
-$\mathcal{L}_{\nabla\cdot B}$ & divergence loss & Penalizes nonzero magnetic divergence. \\
+$(x,y,t)$ & coordinates and time & Spatial coordinates and time presented to the network. \\
+$\rho$ & mass density & Plasma density. In the reduced benchmark it remains at $\rho_0$. \\
+$u_x,u_y,u_z$ & velocity components & Components of the plasma bulk velocity. Only $u_z$ is dynamically active in the reduced benchmark. \\
+$p$ & gas pressure & Thermal pressure. In the reduced benchmark it remains at $p_0$. \\
+$B_x,B_y,B_z$ & magnetic-field components & Magnetic-field components. Only $B_z$ is dynamically active in the reduced benchmark; $B_x=B_0$ remains constant. \\
+$\rho_0,p_0,B_0$ & background state values & Uniform equilibrium values used by the Alfv\'en benchmark. \\
+$v_A$ & Alfv\'en speed & Propagation speed $v_A=B_0/\sqrt{\rho_0}$ in the normalized system. \\
+$\mathcal{N}_{\theta}$ & neural network & Parametric map from coordinates to predicted fields, with trainable parameters $\theta$. \\
+$\mathcal{L}_{\mathrm{IC}}$ & initial-condition loss & Penalizes mismatch with the known state at $t=0$. \\
+$\mathcal{L}_{\mathrm{BC}}$ & boundary-condition loss & Penalizes mismatch between periodic boundaries. \\
+$\mathcal{L}_{\mathrm{PDE}}$ & PDE-residual loss & Penalizes failure to satisfy the reduced Alfv\'en dynamics. \\
+$\mathcal{L}_{y}$ & $y$-uniformity loss & Penalizes dependence on $y$ in a benchmark that should be one-dimensional. \\
+$\mathcal{L}_{\mathrm{bg}}$ & background-state loss & Penalizes drift of quantities that should stay constant. \\
+$\mathcal{L}_{\nabla\cdot B}$ & divergence loss & Penalizes violation of $\nabla\cdot\Bvec=0$. \\
 \bottomrule
 \end{longtable}
 
-\section{Why the first PINN should not start from the full general 2D ideal-MHD residuals}
+\section{Why the first PINN should not begin from the full eight-equation system}
+A fully general two-dimensional ideal-MHD PINN is possible in principle, but it is not the best first scientific step. The reasons are physical, numerical, and methodological.
 
-A fully general two-dimensional ideal-MHD PINN is possible in principle, but it is a large step because the network must satisfy eight coupled nonlinear equations, a divergence-free magnetic-field constraint, suitable boundary conditions, and stable training across multiple wave families. That is a difficult problem even when the conventional solver is already working.
+\subsection{Physical reason}
+The full ideal-MHD system couples multiple wave families:
+\begin{itemize}[leftmargin=1.8em]
+    \item Alfv\'en waves,
+    \item slow magnetosonic waves,
+    \item fast magnetosonic waves,
+    \item entropy-like advective behavior,
+    \item the magnetic-divergence constraint.
+\end{itemize}
+If a first PINN fails on that full system, it becomes hard to tell whether the problem is:
+\begin{itemize}[leftmargin=1.8em]
+    \item the choice of network architecture,
+    \item the loss design,
+    \item poor optimization,
+    \item bad collocation sampling,
+    \item or a misunderstanding of the underlying benchmark physics.
+\end{itemize}
 
-For this project, the first PINN is meant to answer a narrower scientific question: can a network reproduce the same Alfv\'en-wave physics already verified by the finite-volume solver? The best first answer is not to jump immediately to the full nonlinear system. The best first answer is to use the Alfv\'en benchmark itself and enforce the exact reduced dynamics that apply to that benchmark.
+\subsection{Methodological reason}
+A project should first ask a narrow question that can be answered clearly:
+\begin{center}
+\emph{Can a PINN reproduce the simplest physically nontrivial MHD benchmark if the relevant residual system is encoded correctly?}
+\end{center}
+The Alfv\'en benchmark is ideal for that because its reduced dynamics can be derived explicitly from ideal MHD and its exact solution is known.
 
 \begin{physicsbox}
-\textbf{Design principle.} The first PINN should be strong enough to be physically meaningful, but narrow enough to be trainable and explainable. That is why the first executable PINN uses the reduced shear-Alfv\'en subsystem derived from ideal MHD rather than the entire general system.
+\textbf{Design principle.} The first PINN should be strong enough to be a real physics problem, but narrow enough that success or failure can be interpreted cleanly.
 \end{physicsbox}
 
 \section{Reduced Alfv\'en dynamics derived from ideal MHD}
 
-\subsection{Benchmark background state}
-The Alfv\'en verification problem uses the background state
+\subsection{Starting point: the benchmark background state}
+The equilibrium is
 \begin{equation}
-\rho = \rho_0,
-\qquad
-p = p_0,
-\qquad
-\mathbf{u}_0=(0,0,0),
-\qquad
-\mathbf{B}_0=(B_0,0,0).
+\rho=\rho_0,\qquad
+p=p_0,\qquad
+\uvec_0=(0,0,0),\qquad
+\Bvec_0=(B_0,0,0).
+\label{eq:m3-bg}
 \end{equation}
-A small perturbation is introduced only in the transverse out-of-plane quantities $u_z$ and $B_z$.
+The perturbation is carried by
+\begin{equation}
+u_z(x,t),\qquad B_z(x,t),
+\end{equation}
+while the other fields remain at their background values.
 
-\subsection{Why the problem reduces so strongly}
-For this specific benchmark, the solution remains
-\begin{itemize}[leftmargin=1.8em]
-    \item uniform in $y$,
-    \item incompressible to leading order for the chosen small-amplitude mode,
-    \item constant in $\rho$, $p$, and $B_x$,
-    \item zero in $u_x$, $u_y$, and $B_y$.
-\end{itemize}
-Under those conditions, the dynamical part of the ideal-MHD system reduces to a coupled first-order system for $u_z$ and $B_z$:
+\subsection{Reduction assumptions}
+The benchmark is built so that the following statements are valid:
+\begin{enumerate}[leftmargin=1.8em]
+    \item the solution is uniform in $y$,
+    \item the perturbation amplitude is small,
+    \item density and pressure remain constant to leading order,
+    \item $u_x=u_y=0$ and $B_y=0$,
+    \item only the transverse pair $(u_z,B_z)$ evolves dynamically.
+\end{enumerate}
+These assumptions reduce the full ideal-MHD system to the pair
 \begin{equation}
 \pdv{u_z}{t} - \frac{B_0}{\rho_0}\pdv{B_z}{x}=0,
-\label{eq:uz-reduced}
+\label{eq:m3-red1}
 \end{equation}
 \begin{equation}
 \pdv{B_z}{t} - B_0\pdv{u_z}{x}=0.
-\label{eq:Bz-reduced}
+\label{eq:m3-red2}
 \end{equation}
+The derivation was already shown in Module~2; here the main point is that the PINN loss should be built from the \emph{physics that actually governs this benchmark}, not from unrelated residuals.
 
-\subsection{Derivation of the wave equation}
-Differentiate Eq.~\eqref{eq:uz-reduced} with respect to time:
+\subsection{Residual form}
+Move each equation to one side:
 \begin{equation}
-\pdv[2]{u_z}{t} - \frac{B_0}{\rho_0}\pdv{}{x}\left(\pdv{B_z}{t}\right)=0.
+R_{u_z}(x,t)
+=
+\pdv{u_z}{t}
+-
+\frac{B_0}{\rho_0}\pdv{B_z}{x},
+\label{eq:m3-ruz}
 \end{equation}
-Then substitute Eq.~\eqref{eq:Bz-reduced} into the second term:
 \begin{equation}
-\pdv[2]{u_z}{t} - \frac{B_0}{\rho_0}\pdv{}{x}\left(B_0\pdv{u_z}{x}\right)=0.
+R_{B_z}(x,t)
+=
+\pdv{B_z}{t}
+-
+B_0\pdv{u_z}{x}.
+\label{eq:m3-rbz}
 \end{equation}
-Because $B_0$ and $\rho_0$ are constants,
-\begin{equation}
-\pdv[2]{u_z}{t} - \frac{B_0^2}{\rho_0}\pdv[2]{u_z}{x}=0.
-\end{equation}
-This is a one-dimensional wave equation with wave speed
-\begin{equation}
- v_A = \frac{B_0}{\sqrt{\rho_0}}.
-\end{equation}
-The same argument applies to $B_z$. So the reduced system preserves the exact Alfv\'en propagation physics that the benchmark is supposed to test.
+The exact solution makes both residuals zero at every point.
 
-\section{What the PINN predicts}
-The neural network takes a point in space-time,
-\begin{equation}
-(x,y,t),
-\end{equation}
-and returns eight predicted fields,
+\section{What the network predicts and why}
+The network takes a point in space-time and returns eight fields:
 \begin{equation}
 \mathcal{N}_{\theta}(x,y,t)
 =
-\bigl(\rho, u_x, u_y, u_z, p, B_x, B_y, B_z\bigr).
+\bigl(
+\rho,
+u_x,u_y,u_z,
+p,
+B_x,B_y,B_z
+\bigr).
+\label{eq:m3-net}
 \end{equation}
-This is important. Even though only $u_z$ and $B_z$ are dynamically active in the reduced benchmark, the network still predicts the full eight-field state. That keeps the project architecture aligned with the eventual full MHD PINN.
+At first that may seem wasteful. If only $u_z$ and $B_z$ are dynamically active, why predict the full state?
 
-\section{Loss terms used in the executable PINN}
+The answer is architectural continuity. The eventual goal of the project is a broader MHD PINN, so it is useful for the interface to already look like a full MHD predictor. The reduced benchmark is then enforced through the loss, not by hard-wiring the output dimension down to two variables.
+
+\section{How a PINN enforces physics}
+
+\subsection{General idea}
+A PINN is different from ordinary supervised learning. In ordinary supervised learning, a network is shown many input-output pairs and is trained to reproduce them. In a PINN, the network is also penalized for violating differential equations and constraints. That means the loss function is not just a data mismatch; it is a statement of what the predicted fields are supposed to \emph{be physically allowed to do}.
+
+\subsection{Collocation points}
+Choose many sample points in the domain:
+\begin{equation}
+\{(x^{(n)},y^{(n)},t^{(n)})\}_{n=1}^{N_c}.
+\end{equation}
+At each point, evaluate the network output and its derivatives using automatic differentiation. Those derivatives are inserted into the residual formulas \eqref{eq:m3-ruz} and \eqref{eq:m3-rbz}. This is how the network is forced to ``feel'' the PDE.
+
+\section{Loss terms in detail}
 
 \subsection{Initial-condition loss}
-At $t=0$, the benchmark state is known exactly. So the initial-condition loss is a sum of mean-squared errors between the network outputs and the analytical initial state:
+At $t=0$, the benchmark state is known exactly:
 \begin{equation}
-\mathcal{L}_{\mathrm{IC}} = \mathrm{MSE}(\rho,\rho_0)+\mathrm{MSE}(u_x,0)+\mathrm{MSE}(u_y,0)+\mathrm{MSE}(u_z,u_z^{\mathrm{exact}})+\cdots+\mathrm{MSE}(B_z,B_z^{\mathrm{exact}}).
+u_z(x,0)=A\sin(kx),\qquad
+B_z(x,0)=-\sqrt{\rho_0}A\sin(kx),
+\label{eq:m3-ic-active}
 \end{equation}
-This anchors the network to the correct physical starting state.
+with the remaining fields fixed at background values. Therefore
+\begin{align}
+\mathcal{L}_{\mathrm{IC}}
+&=
+\mathrm{MSE}(\rho,\rho_0)
++
+\mathrm{MSE}(u_x,0)
++
+\mathrm{MSE}(u_y,0)
++
+\mathrm{MSE}(p,p_0)
+\nonumber\\
+&\quad
++
+\mathrm{MSE}(B_x,B_0)
++
+\mathrm{MSE}(B_y,0)
++
+\mathrm{MSE}(u_z,A\sin(kx))
++
+\mathrm{MSE}(B_z,-\sqrt{\rho_0}A\sin(kx)).
+\label{eq:m3-lic}
+\end{align}
+This term anchors the network to the correct starting state.
 
 \subsection{Periodic-boundary loss}
-The finite-volume verification problem uses periodic boundaries in $x$. The PINN mirrors that by forcing the left and right boundary predictions to match:
+The conventional benchmark uses periodic boundaries in $x$. The PINN should mirror that physics:
 \begin{equation}
-\mathcal{L}_{\mathrm{BC}} = \mathrm{MSE}\left(\mathcal{N}_{\theta}(x_{\min},y,t),\;\mathcal{N}_{\theta}(x_{\max},y,t)\right).
+q(x_{\min},y,t)=q(x_{\max},y,t)
 \end{equation}
-This does not prescribe the value of the solution at the boundaries. It prescribes that the two boundaries represent the same physical location on a periodic domain.
+for each predicted field $q$. So one natural loss is
+\begin{equation}
+\mathcal{L}_{\mathrm{BC}}
+=
+\sum_{q}
+\mathrm{MSE}\!\left(
+q(x_{\min},y,t),\;
+q(x_{\max},y,t)
+\right).
+\label{eq:m3-lbc}
+\end{equation}
+This is not prescribing the value at the boundary; it is enforcing the topology of the periodic domain.
 
-\subsection{Reduced PDE loss}
-The core dynamical loss uses Eqs.~\eqref{eq:uz-reduced} and \eqref{eq:Bz-reduced}:
+\subsection{Reduced-PDE loss}
+At collocation points inside the domain, the reduced Alfv\'en residuals should vanish. Therefore
 \begin{equation}
-\mathcal{L}_{\mathrm{PDE}} = \mathrm{MSE}\left(\pdv{u_z}{t} - \frac{B_0}{\rho_0}\pdv{B_z}{x},\;0\right)
+\mathcal{L}_{\mathrm{PDE}}
+=
+\mathrm{MSE}(R_{u_z},0)
 +
-\mathrm{MSE}\left(\pdv{B_z}{t} - B_0\pdv{u_z}{x},\;0\right).
+\mathrm{MSE}(R_{B_z},0).
+\label{eq:m3-lpde}
 \end{equation}
-This is the part that makes the neural network physics-informed rather than merely data-fitted.
+This is the core physics term for the first executable PINN. It is where the benchmark dynamics enters.
+
+\subsection{$y$-uniformity loss}
+Although the network accepts $(x,y,t)$ as input, the benchmark solution is independent of $y$. So the network should also learn
+\begin{equation}
+\pdv{q}{y}=0
+\end{equation}
+for every predicted field $q$. One way to enforce that is
+\begin{equation}
+\mathcal{L}_{y}
+=
+\sum_{q}
+\mathrm{MSE}\!\left(\pdv{q}{y},0\right).
+\label{eq:m3-ly}
+\end{equation}
+This is not a random regularizer. It is a physics statement about the benchmark symmetry.
 
 \subsection{Background-state loss}
-Because the exact benchmark keeps $\rho$, $p$, and $B_x$ constant and keeps $u_x$, $u_y$, and $B_y$ zero, we add
+Several fields should stay fixed throughout the reduced benchmark:
 \begin{equation}
-\mathcal{L}_{\mathrm{bg}} = \mathrm{MSE}(\rho-\rho_0,0)+\mathrm{MSE}(p-p_0,0)+\mathrm{MSE}(B_x-B_0,0)
-+\mathrm{MSE}(u_x,0)+\mathrm{MSE}(u_y,0)+\mathrm{MSE}(B_y,0).
+\rho=\rho_0,\qquad
+p=p_0,\qquad
+B_x=B_0,\qquad
+u_x=u_y=B_y=0.
 \end{equation}
-This does not add new physics beyond the benchmark. It simply prevents the network from wandering into unnecessary degrees of freedom that the exact solution does not use.
-
-\subsection{y-uniformity loss}
-The benchmark solution is independent of $y$. So we penalize $y$-derivatives of every predicted field:
-\begin{equation}
-\mathcal{L}_y = \sum_{q\in\{\rho,u_x,u_y,u_z,p,B_x,B_y,B_z\}} \mathrm{MSE}\left(\pdv{q}{y},0\right).
-\end{equation}
-This is a very deliberate choice. The solver itself is two-dimensional, but the benchmark is not oblique yet. Therefore the network should also learn that the physical solution is uniform in the transverse direction.
+Those conditions can be encouraged away from the initial slice through
+\begin{align}
+\mathcal{L}_{\mathrm{bg}}
+&=
+\mathrm{MSE}(\rho,\rho_0)
++
+\mathrm{MSE}(p,p_0)
++
+\mathrm{MSE}(B_x,B_0)
+\nonumber\\
+&\quad
++
+\mathrm{MSE}(u_x,0)
++
+\mathrm{MSE}(u_y,0)
++
+\mathrm{MSE}(B_y,0).
+\label{eq:m3-lbg}
+\end{align}
+This prevents the network from inventing spurious compressive or oblique structure that does not belong to the benchmark.
 
 \subsection{Divergence-free magnetic-field loss}
-The magnetic field must satisfy
+Ideal MHD requires
 \begin{equation}
-\nabla\cdot\mathbf{B}=\pdv{B_x}{x}+\pdv{B_y}{y}=0.
+\nabla\cdot\Bvec
+=
+\pdv{B_x}{x}+\pdv{B_y}{y}=0.
+\label{eq:m3-divb}
 \end{equation}
-So the PINN includes
+For the exact benchmark this is trivially true because $B_x=B_0$ and $B_y=0$. Even so, it is worth keeping the term
 \begin{equation}
-\mathcal{L}_{\nabla\cdot B} = \mathrm{MSE}\left(\pdv{B_x}{x}+\pdv{B_y}{y},0\right).
+\mathcal{L}_{\nabla\cdot B}
+=
+\mathrm{MSE}\!\left(
+\pdv{B_x}{x}+\pdv{B_y}{y},
+0
+\right),
+\label{eq:m3-ldivb}
 \end{equation}
-For the exact benchmark this residual is trivially satisfied because $B_x=B_0$ and $B_y=0$, but it is still worth including because divergence control is structurally central to MHD.
+because divergence control is structurally central to all later MHD models.
 
 \subsection{Total loss}
-The total training objective is a weighted sum:
+A weighted total loss may be written schematically as
 \begin{equation}
-\mathcal{L} = \lambda_{\mathrm{IC}}\mathcal{L}_{\mathrm{IC}} + \lambda_{\mathrm{BC}}\mathcal{L}_{\mathrm{BC}} + \lambda_{\mathrm{PDE}}\mathcal{L}_{\mathrm{PDE}} + \lambda_y\mathcal{L}_y + \lambda_{\mathrm{bg}}\mathcal{L}_{\mathrm{bg}} + \lambda_{\nabla\cdot B}\mathcal{L}_{\nabla\cdot B}.
+\mathcal{L}_{\mathrm{total}}
+=
+w_{\mathrm{IC}}\mathcal{L}_{\mathrm{IC}}
++
+w_{\mathrm{BC}}\mathcal{L}_{\mathrm{BC}}
++
+w_{\mathrm{PDE}}\mathcal{L}_{\mathrm{PDE}}
++
+w_y \mathcal{L}_y
++
+w_{\mathrm{bg}}\mathcal{L}_{\mathrm{bg}}
++
+w_{\nabla\cdot B}\mathcal{L}_{\nabla\cdot B}.
+\label{eq:m3-ltotal}
 \end{equation}
-The weights do not change the physics. They tune the relative pressure placed on each requirement during optimization.
+The weights matter because a PINN is solving a multi-objective optimization problem: it must satisfy data anchoring, PDE residuals, symmetry constraints, and structural MHD constraints simultaneously.
 
-\section{Why automatic differentiation is essential}
-The PINN needs spatial and temporal derivatives of the network outputs. Those derivatives are obtained by automatic differentiation, not by finite differences on a grid. That is one of the key differences between the PINN and the finite-volume solver:
+\section{Why the PINN benchmark remains scientifically honest}
+
+\subsection{What is being enforced}
+The first PINN is enforcing:
 \begin{itemize}[leftmargin=1.8em]
-    \item the finite-volume solver approximates derivatives by conservative flux balances on a grid,
-    \item the PINN obtains derivatives from the neural network itself by differentiating the computational graph.
+    \item the exact initial state,
+    \item periodicity,
+    \item the reduced Alfv\'en dynamics,
+    \item $y$-uniformity,
+    \item background-state invariants,
+    \item magnetic divergence control.
 \end{itemize}
-This is why the code uses derivative-based residual functions inside the training loop.
 
-\section{Why this PINN is scientifically useful even though it is not yet fully general}
-It would be a mistake to dismiss this stage as ``not the real MHD PINN'' simply because it is benchmark-specific. This stage is scientifically useful for three reasons:
+\subsection{What is \emph{not} yet being claimed}
+The first PINN is \emph{not} yet claiming to solve:
+\begin{itemize}[leftmargin=1.8em]
+    \item the full nonlinear two-dimensional ideal-MHD system,
+    \item oblique wave interactions,
+    \item compressive magnetosonic dynamics,
+    \item shocklike structures,
+    \item arbitrary boundary-value problems.
+\end{itemize}
+This honesty matters. A reduced benchmark PINN is still valuable, but only if it is described accurately.
+
+\section{Why the Alfv\'en benchmark is the right first PINN target}
+The benchmark has several strengths:
 \begin{enumerate}[leftmargin=1.8em]
-    \item It tests whether a neural network can learn the same verified Alfv\'en-wave physics already captured by the conventional solver.
-    \item It preserves the eight-field project architecture, so the transition to a more general PINN remains natural.
-    \item It forces the project to confront the practical issues of collocation sampling, loss balancing, automatic differentiation, and training diagnostics before moving to the full nonlinear two-dimensional system.
+    \item the reduced PDEs can be derived transparently from ideal MHD,
+    \item the exact solution is known,
+    \item the physically active fields are easy to interpret,
+    \item the benchmark is simple enough that training failure is informative rather than mysterious,
+    \item success provides a meaningful stepping stone toward richer MHD PINN formulations.
 \end{enumerate}
 
 \begin{physicsbox}
-\textbf{Most important interpretation.} The finite-volume solver remains the reference solver. The PINN is being introduced as a second physics-constrained modeling tool, not as a replacement built on wishful thinking. That is exactly the right scientific posture for an interview project.
+\textbf{Bottom line.} The first PINN in this project is not meant to be the final word on MHD neural solvers. It is meant to be the first controlled experiment in which a neural network is asked to satisfy a clean, derivable, and physically interpretable MHD subsystem.
 \end{physicsbox}
 
-\section{What the next PINN step should be}
-Once this benchmark-specific PINN is working and compared against the verified solver, the next logical step is not immediately the hardest possible full system. The next logical step is to relax one simplification at a time. The most natural sequence is:
-\begin{enumerate}[leftmargin=1.8em]
-    \item move from the reduced Alfv\'en residuals toward a broader subset of the ideal-MHD conservation laws,
-    \item test on an oblique Alfv\'en wave that genuinely depends on both spatial directions,
-    \item only then attempt a more general two-dimensional nonlinear case such as the magnetic-pressure pulse.
-\end{enumerate}
-That staged approach keeps the project intellectually honest and technically controlled.
+\section{What Module 3 accomplishes}
+Module~3 converts the Alfv\'en benchmark from a finite-volume verification problem into a PINN problem. It does so by:
+\begin{itemize}[leftmargin=1.8em]
+    \item deriving the reduced benchmark residuals from ideal MHD,
+    \item defining exactly which fields the network predicts,
+    \item constructing loss terms that encode the benchmark physics and symmetry,
+    \item clarifying what the first PINN stage does and does not claim.
+\end{itemize}
+That makes the PINN stage interpretable, technically manageable, and consistent with the broader long-term architecture of the project.
 
 \end{document}

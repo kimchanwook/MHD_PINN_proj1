@@ -1,55 +1,79 @@
 \documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage{microtype}
 \usepackage[table]{xcolor}
-\usepackage{amsmath,amssymb,mathtools,bm}
-\usepackage{booktabs,array,longtable,tabularx}
-\usepackage{hyperref}
+\usepackage{amsmath,amssymb,amsfonts,mathtools,bm}
+\usepackage{physics}
+\usepackage{booktabs,longtable,array}
 \usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage[most]{tcolorbox}
 \usepackage{fancyhdr}
+\usepackage{lastpage}
 \usepackage{titlesec}
-\usepackage{tcolorbox}
-\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+\usepackage{mathrsfs}
 
-\definecolor{TitleBlue}{HTML}{163A5F}
-\definecolor{AccentTeal}{HTML}{2D6F73}
-\definecolor{SoftBlue}{HTML}{EAF3F8}
-\definecolor{SoftTeal}{HTML}{EDF8F6}
-\definecolor{SoftGray}{HTML}{F5F7FA}
+\definecolor{Navy}{HTML}{1F3A5F}
+\definecolor{SoftBlue}{HTML}{EAF2F8}
+\definecolor{SoftGray}{HTML}{F7F9FA}
+\definecolor{RuleGray}{HTML}{D6DBDF}
 
 \pagestyle{fancy}
 \fancyhf{}
-\lhead{PINN for Two-Dimensional MHD Evolution}
+\lhead{MHD\_PINN\_proj1}
 \rhead{Module 2 Physics Notes}
-\cfoot{\thepage}
+\cfoot{\thepage\ of \pageref{LastPage}}
 \setlength{\headheight}{14pt}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
 
-\titleformat{\section}{\Large\bfseries\color{TitleBlue}}{\thesection}{0.6em}{}
-\titleformat{\subsection}{\large\bfseries\color{AccentTeal}}{\thesubsection}{0.6em}{}
-\titleformat{\subsubsection}{\normalsize\bfseries\color{TitleBlue}}{\thesubsubsection}{0.6em}{}
+\titleformat{\section}{\large\bfseries\color{Navy}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{Navy}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
 
-\newtcolorbox{overviewbox}{colback=SoftBlue,colframe=TitleBlue,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
-\newtcolorbox{physicsbox}{colback=SoftTeal,colframe=AccentTeal,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newcommand{\uvec}{\mathbf{u}}
+\newcommand{\Bvec}{\mathbf{B}}
+\newcommand{\Uvec}{\mathbf{U}}
+\newcommand{\ptot}{p_{\mathrm{tot}}}
+\newcommand{\xhat}{\hat{\mathbf{x}}}
+\newcommand{\yhat}{\hat{\mathbf{y}}}
+\newcommand{\zhat}{\hat{\mathbf{z}}}
+
+\newtcolorbox{overviewbox}{
+  colback=SoftBlue,
+  colframe=Navy,
+  boxrule=0.7pt,
+  arc=2pt,
+  left=8pt,right=8pt,top=8pt,bottom=8pt
+}
+\newtcolorbox{physicsbox}{
+  colback=SoftGray,
+  colframe=RuleGray,
+  boxrule=0.5pt,
+  arc=2pt,
+  left=8pt,right=8pt,top=8pt,bottom=8pt
+}
 
 \begin{document}
 
 \begin{center}
-    {\LARGE \bfseries \color{TitleBlue} Module 2 Physics Notes: Alfv\'en-Wave Verification and Nonlinear Magnetic-Pressure Pulse}\\[0.5em]
-    {\large \color{AccentTeal} Physics-Informed Neural Network for Two-Dimensional MHD Evolution}\\[0.8em]
-    {\normalsize Purpose: explain why the two benchmark problems are physically meaningful and how the upgraded solver is assessed.}
+    {\LARGE\bfseries Module 2: Alfv\'en-Wave Verification and Magnetic-Pressure Pulse}\\[0.6em]
+    {\large MHD\_PINN\_proj1 Physics Notes}\\[0.4em]
+    {\normalsize Revised to be explicit, step-by-step, and derivation-heavy}
 \end{center}
 
-\vspace{0.5em}
+\vspace{0.8em}
 
 \begin{overviewbox}
-\textbf{Scope of this note.} This file explains the two benchmark problems used after the baseline ideal MHD equations are implemented: a small-amplitude Alfv\'en wave for verification and a magnetic-pressure pulse for nonlinear demonstration. The note also explains why the piecewise-linear reconstruction, the minmod limiter, and second-order Runge-Kutta time stepping improve the numerical quality of the solver.
+These notes explain the two benchmark problems used after the baseline ideal-MHD equations are in place:
+(1) a small-amplitude Alfv\'en wave for \emph{verification}, and
+(2) a localized magnetic-pressure pulse for a \emph{nonlinear two-dimensional demonstration}.
+The emphasis is not just on what the initial conditions are, but on why those problems were chosen, how their physics follows from the ideal-MHD equations, and what diagnostics genuinely test the solver.
 \end{overviewbox}
 
 \section{Symbol and variable table}
-
 \rowcolors{2}{SoftGray}{white}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.18\textwidth} >{\raggedright\arraybackslash}p{0.28\textwidth} >{\raggedright\arraybackslash}p{0.46\textwidth}}
 \toprule
@@ -60,168 +84,384 @@
 \textbf{Symbol} & \textbf{Name} & \textbf{Meaning} \\
 \midrule
 \endhead
-$\rho_0$ & background mass density & Uniform density of the unperturbed plasma. \\
-$p_0$ & background gas pressure & Uniform thermal pressure of the unperturbed plasma. \\
-$B_0$ & background magnetic field magnitude & Constant magnetic field used for the Alfv\'en-wave verification case. \\
-$A$ & perturbation amplitude & Size of the imposed sinusoidal or Gaussian perturbation. \\
-$k$ & wave number & Spatial frequency of the sinusoidal Alfv\'en perturbation. \\
-$\lambda$ & wavelength & Distance over which the Alfv\'en wave repeats. \\
-$v_A$ & Alfv\'en speed & Characteristic propagation speed of the Alfv\'en wave in normalized units. \\
-$T$ & wave period & Time for the wave to advance by one wavelength. \\
-$u_z$ & out-of-plane velocity & Transverse velocity used to represent the shear Alfv\'en mode. \\
-$B_z$ & out-of-plane magnetic field & Transverse magnetic perturbation coupled to $u_z$ in the Alfv\'en wave. \\
-$x_0,y_0$ & pulse-center coordinates & Center of the localized magnetic-pressure pulse. \\
-$\sigma$ & pulse width & Characteristic width of the Gaussian magnetic pulse. \\
-$\Delta x,\Delta y$ & cell widths & Uniform cell sizes in the $x$ and $y$ directions. \\
-$\Delta t$ & time-step size & Numerical time step chosen from a CFL stability restriction. \\
-$\mathrm{PLM}$ & piecewise-linear method & Reconstruction that represents each cell with a limited linear profile instead of a constant value. \\
-$\mathrm{RK2}$ & second-order Runge-Kutta & Two-stage explicit time integrator used to improve temporal accuracy. \\
-$\nabla\cdot\mathbf{B}$ & magnetic divergence & Diagnostic that should remain small in a physically correct MHD solution. \\
-$L^2$ error & root-mean-square error norm & Discrete measure of the difference between the numerical and reference solution. \\
+$\rho_0$ & background mass density & Uniform density of the unperturbed equilibrium. \\
+$p_0$ & background gas pressure & Uniform thermal pressure of the unperturbed equilibrium. \\
+$B_0$ & background magnetic-field magnitude & Constant background field used in the Alfv\'en benchmark. \\
+$A$ & perturbation amplitude & Size of the sinusoidal or Gaussian perturbation imposed initially. \\
+$k$ & wave number & Spatial frequency of the sinusoidal Alfv\'en mode. \\
+$\lambda$ & wavelength & Spatial period of the Alfv\'en wave, $\lambda=2\pi/k$. \\
+$v_A$ & Alfv\'en speed & Characteristic propagation speed of the shear Alfv\'en mode. \\
+$T$ & wave period & Time required for the wave to travel one wavelength. \\
+$u_z$ & out-of-plane velocity & Transverse velocity component used by the benchmark Alfv\'en mode. \\
+$B_z$ & out-of-plane magnetic perturbation & Transverse magnetic perturbation coupled to $u_z$. \\
+$x_0,y_0$ & pulse-center coordinates & Center of the Gaussian magnetic-pressure pulse. \\
+$\sigma$ & pulse width & Characteristic radius of the Gaussian pulse. \\
+$\Delta x,\Delta y$ & cell widths & Uniform grid spacing in the two coordinate directions. \\
+$\Delta t$ & time-step size & Explicit time step set by the Courant--Friedrichs--Lewy stability restriction. \\
+$L^2$ error & root-mean-square error norm & Discrete measure of the mismatch between numerical and reference solutions. \\
+$\nabla\cdot\Bvec$ & magnetic divergence & Quantity that must remain small for a physically acceptable MHD computation. \\
 \bottomrule
 \end{longtable}
 
-\section{Why the Alfv\'en wave is the first verification case}
-
-\subsection{Physical meaning of the Alfv\'en wave}
-An Alfv\'en wave is one of the fundamental wave families of ideal magnetohydrodynamics. It can be understood as a transverse disturbance that travels along the magnetic field because magnetic tension acts as the restoring mechanism and fluid inertia provides the mass that resists acceleration.
-
-A useful analogy is a stretched string. If the string is displaced sideways, tension pulls it back and the displacement travels along the string as a wave. In MHD, the magnetic field lines play the role of the tension-bearing structure, although the medium is a conducting fluid rather than a solid string.
+\section{Why these two cases are used together}
+The project needs more than one test because one benchmark cannot answer every numerical question. The two chosen cases serve different roles:
+\begin{enumerate}[leftmargin=1.8em]
+    \item The Alfv\'en wave is a \textbf{verification problem}. It has a known propagation speed and a simple analytical solution. That makes it ideal for asking, ``Is the solver reproducing the correct MHD wave physics?''
+    \item The magnetic-pressure pulse is a \textbf{nonlinear demonstration problem}. It does not have a simple closed-form exact solution, but it does produce interpretable two-dimensional dynamics driven by magnetic overpressure. That makes it ideal for asking, ``Can the solver evolve a genuinely nonlinear 2D MHD configuration without immediately producing nonsense?''
+\end{enumerate}
 
 \begin{physicsbox}
-\textbf{Important point.} The Alfv\'en wave is a verification problem, not just a visual demonstration. Its propagation speed is known in advance, so the solver can be tested against a precise physical expectation rather than only qualitative behavior.
+\textbf{Important distinction.} A verification case checks correctness against known mathematics. A demonstration case checks whether the code can produce believable physics in a more complicated setting. The project needs both.
 \end{physicsbox}
 
-\subsection{Background state and perturbation}
-For the verification problem, the background state is chosen to be spatially uniform:
-\begin{equation}
-\rho = \rho_0, \qquad p = p_0, \qquad \mathbf{u}_0 = (0,0,0), \qquad \mathbf{B}_0 = (B_0,0,0).
-\end{equation}
-A small transverse perturbation is then added in the out-of-plane components:
-\begin{equation}
-u_z(x,0) = A \sin(kx),
-\end{equation}
-\begin{equation}
-B_z(x,0) = -\sqrt{\rho_0}\,A \sin(kx).
-\end{equation}
-The minus sign selects one propagation direction. The perturbation depends only on $x$, but it is still run inside the two-dimensional code so that the full 2D data layout and boundary handling are exercised.
+\section{The Alfv\'en wave from the ideal-MHD equations}
 
-\subsection{Derivation of the Alfv\'en speed}
-In normalized ideal MHD units, the Alfv\'en speed is
+\subsection{Background state}
+The benchmark begins from a simple uniform equilibrium:
+\begin{equation}
+\rho = \rho_0, \qquad
+p = p_0, \qquad
+\uvec_0 = (0,0,0), \qquad
+\Bvec_0 = (B_0,0,0).
+\label{eq:m2-bg}
+\end{equation}
+This means:
+\begin{itemize}[leftmargin=1.8em]
+    \item the plasma is initially at rest,
+    \item density and thermal pressure are constant everywhere,
+    \item the magnetic field is straight and points along the $x$-direction.
+\end{itemize}
+That straight background field is important because the Alfv\'en wave propagates \emph{along} magnetic field lines.
+
+\subsection{What kind of perturbation is added}
+A small transverse perturbation is placed in the out-of-plane components:
+\begin{equation}
+u_z(x,0) = A\sin(kx),
+\label{eq:m2-uz-init}
+\end{equation}
+\begin{equation}
+B_z(x,0) = -\sqrt{\rho_0}\,A\sin(kx).
+\label{eq:m2-bz-init}
+\end{equation}
+All other perturbations are zero. This is a very deliberate choice. It means:
+\begin{itemize}[leftmargin=1.8em]
+    \item the disturbance varies only along the field direction $x$,
+    \item the velocity perturbation is perpendicular to $\Bvec_0$,
+    \item the magnetic perturbation is also perpendicular to $\Bvec_0$,
+    \item the disturbance is small enough that linearization is justified.
+\end{itemize}
+
+\subsection{Why the restoring force is magnetic tension}
+The momentum equation from Module~1 contains the magnetic-force density in the form
+\begin{equation}
+\mathbf{f}_B
+=
+-\nabla\left(\frac{B^2}{2}\right)
++
+(\Bvec\cdot\nabla)\Bvec
+\label{eq:m2-mag-force}
+\end{equation}
+in the normalized units used by the project.
+
+For the benchmark equilibrium, the background field is straight and uniform, so the magnetic-pressure gradient of the background is zero. The physically active force is therefore the field-line-tension response to the transverse bend created by the perturbation. The field behaves like a tension-bearing structure: if a field line is bent sideways, the curvature produces a restoring force that tries to straighten it.
+
+\subsection{Derivation of the reduced Alfv\'en system}
+We now derive the reduced equations rather than simply stating them.
+
+Start from the ideal-MHD momentum equation in nonconservative form:
+\begin{equation}
+\rho \frac{D\uvec}{Dt}
+=
+-\nabla p
+-\nabla\left(\frac{B^2}{2}\right)
++
+(\Bvec\cdot\nabla)\Bvec.
+\label{eq:m2-mom-full}
+\end{equation}
+Also start from the induction equation:
+\begin{equation}
+\pdv{\Bvec}{t}
+=
+\nabla\times(\uvec\times\Bvec).
+\label{eq:m2-induction-full}
+\end{equation}
+
+Now impose the Alfv\'en-wave assumptions:
+\begin{equation}
+\rho=\rho_0, \qquad p=p_0, \qquad
+\uvec=(0,0,u_z(x,t)), \qquad
+\Bvec=(B_0,0,B_z(x,t)).
+\label{eq:m2-alfven-assumptions}
+\end{equation}
+These assumptions say that the disturbance is one-dimensional in $x$, transverse in $z$, and incompressible to leading order.
+
+\subsubsection{Step 1: the $z$-component of the momentum equation}
+The left side of \eqref{eq:m2-mom-full} becomes
+\begin{equation}
+\rho_0 \frac{Du_z}{Dt}.
+\end{equation}
+Because the perturbation depends only on $x$ and $t$, and because the background flow in $x$ is zero, the material derivative reduces to
+\begin{equation}
+\frac{Du_z}{Dt} = \pdv{u_z}{t}.
+\end{equation}
+
+Now examine the right side. The pressure gradient has no $z$-component because the perturbation is transverse and pressure remains uniform to leading order. The magnetic-pressure term also has no $z$-component in this linearized geometry, because it points along spatial gradients of $B^2$, which are along $x$. The term that survives is the magnetic-tension term:
+\begin{equation}
+\bigl[(\Bvec\cdot\nabla)\Bvec\bigr]_z.
+\end{equation}
+Since
+\begin{equation}
+\Bvec\cdot\nabla = B_0\pdv{}{x} + B_z\pdv{}{z},
+\end{equation}
+and there is no $z$-dependence, this becomes
+\begin{equation}
+\bigl[(\Bvec\cdot\nabla)\Bvec\bigr]_z
+=
+B_0 \pdv{B_z}{x}.
+\end{equation}
+Therefore the $z$-component of the momentum equation reduces to
+\begin{equation}
+\rho_0 \pdv{u_z}{t} = B_0 \pdv{B_z}{x}.
+\label{eq:m2-uz-eq1}
+\end{equation}
+Equivalently,
+\begin{equation}
+\pdv{u_z}{t} - \frac{B_0}{\rho_0}\pdv{B_z}{x}=0.
+\label{eq:m2-uz-reduced}
+\end{equation}
+
+\subsubsection{Step 2: the $z$-component of the induction equation}
+Now compute $\uvec\times\Bvec$:
+\begin{equation}
+\uvec\times\Bvec
+=
+\begin{vmatrix}
+\xhat & \yhat & \zhat \\
+0 & 0 & u_z \\
+B_0 & 0 & B_z
+\end{vmatrix}
+=
+(0,\;u_z B_0,\;0).
+\label{eq:m2-cross}
+\end{equation}
+Take the curl:
+\begin{equation}
+\nabla\times(\uvec\times\Bvec)
+=
+\nabla\times(0,u_z B_0,0).
+\end{equation}
+Because the quantity depends only on $x$,
+\begin{equation}
+\nabla\times(0,u_z B_0,0)
+=
+\left(0,\;0,\;\pdv{}{x}(u_z B_0)\right).
+\end{equation}
+Since $B_0$ is constant,
+\begin{equation}
+\pdv{B_z}{t} = B_0 \pdv{u_z}{x}.
+\label{eq:m2-bz-reduced}
+\end{equation}
+
+\subsubsection{Step 3: combine the two equations into a wave equation}
+Take a time derivative of \eqref{eq:m2-uz-reduced}:
+\begin{equation}
+\pdv[2]{u_z}{t} - \frac{B_0}{\rho_0}\pdv{}{x}\left(\pdv{B_z}{t}\right)=0.
+\end{equation}
+Substitute \eqref{eq:m2-bz-reduced}:
+\begin{equation}
+\pdv[2]{u_z}{t} - \frac{B_0}{\rho_0}\pdv{}{x}\left(B_0 \pdv{u_z}{x}\right)=0.
+\end{equation}
+Because $B_0$ is constant,
+\begin{equation}
+\pdv[2]{u_z}{t} - \frac{B_0^2}{\rho_0}\pdv[2]{u_z}{x}=0.
+\label{eq:m2-wave-u}
+\end{equation}
+This is the ordinary wave equation with speed
 \begin{equation}
 v_A = \frac{B_0}{\sqrt{\rho_0}}.
+\label{eq:m2-va}
 \end{equation}
-This can be understood dimensionally and physically. A larger magnetic field means stronger magnetic tension, so the wave propagates faster. A larger mass density means larger inertia, so the wave propagates more slowly.
+The same derivation holds for $B_z$.
 
-If the wave number is
+\subsection{Exact traveling-wave solution}
+For the initial sinusoidal mode, the solution is a translated profile:
 \begin{equation}
-k = \frac{2\pi m}{L_x},
+u_z(x,t)=A\sin\left[k(x-v_A t)\right],
+\label{eq:m2-exact-uz}
 \end{equation}
-where $m$ is the integer mode number and $L_x$ is the domain length, then the wavelength is
 \begin{equation}
-\lambda = \frac{2\pi}{k} = \frac{L_x}{m},
+B_z(x,t)=-\sqrt{\rho_0}\,A\sin\left[k(x-v_A t)\right].
+\label{eq:m2-exact-bz}
 \end{equation}
-and the wave period is
+The wavelength and period are
 \begin{equation}
+\lambda = \frac{2\pi}{k},
+\qquad
 T = \frac{\lambda}{v_A}.
+\label{eq:m2-lambda-period}
 \end{equation}
-The exact traveling-wave solution is therefore just the initial profile shifted by $v_A t$:
+
+\subsection{Why the solver can be judged quantitatively}
+Because the benchmark has an explicit analytical solution, the solver can be tested with concrete diagnostics.
+
+\subsubsection{$L^2$ error}
+For a discrete line cut $q_i^{\text{num}}$ and exact values $q_i^{\text{exact}}$, the discrete root-mean-square error is
 \begin{equation}
-u_z(x,t) = A\sin\left[k(x-v_A t)\right],
+\|e\|_{L^2}
+=
+\sqrt{
+\frac{1}{N_x}
+\sum_{i=1}^{N_x}
+\left(q_i^{\text{num}}-q_i^{\text{exact}}\right)^2 }.
+\label{eq:m2-l2}
 \end{equation}
-\begin{equation}
-B_z(x,t) = -\sqrt{\rho_0}\,A\sin\left[k(x-v_A t)\right].
-\end{equation}
+A smaller error means the waveform shape and amplitude are being captured more accurately.
 
-\subsection{Why the $L^2$ error and phase speed matter}
-The $L^2$ error compares the numerical solution to the exact traveling-wave profile. If the error decreases under grid refinement, that is evidence that the solver is converging to the correct physical solution.
+\subsubsection{Measured phase speed}
+The code also measures how far the waveform has shifted in time and compares that against the predicted speed $v_A$. This is important because a numerical method could, in principle, preserve shape reasonably well but move the wave at the wrong speed. The benchmark therefore tests both \emph{shape fidelity} and \emph{characteristic-speed fidelity}.
 
-The phase speed is also measured by estimating how far the waveform has shifted in one period. If the measured speed is close to $v_A$, the code is capturing the correct propagation physics even if some numerical diffusion remains.
+\subsubsection{Why the final time matters}
+If the benchmark is run for exactly one full wave period, a periodic sinusoid returns to the same phase modulo the domain length. Then a crude shift-based diagnostic can report zero net displacement even though the wave propagated correctly. For that reason, measuring the phase shift at a quarter period or another nondegenerate fraction of the period is often a better diagnostic choice.
 
-\section{Why the solver was upgraded from first order to second order}
+\section{Why the solver is upgraded from first order to second order}
 
-\subsection{Limitation of the first-order method}
-A first-order piecewise-constant finite-volume method is robust, but it is numerically diffusive. For a smooth sinusoidal Alfv\'en wave, that diffusion artificially damps the amplitude and makes the line cuts appear too smeared.
+\subsection{What first-order diffusion does to a smooth wave}
+A first-order piecewise-constant finite-volume scheme with a diffusive numerical flux tends to smear smooth structures. For the Alfv\'en benchmark, that means:
+\begin{itemize}[leftmargin=1.8em]
+    \item the sinusoidal crest becomes too rounded,
+    \item the trough becomes too shallow,
+    \item the amplitude decays more than it should,
+    \item the line-cut comparison against the exact solution becomes visibly blurred.
+\end{itemize}
+That is not a failure of the underlying physics model; it is a limitation of the numerical approximation.
 
-\subsection{Piecewise-linear reconstruction}
-The piecewise-linear method represents the cell state as a linear profile rather than a constant value. In one spatial direction, a single cell-centered quantity $q_i$ is approximated as
+\subsection{Why piecewise-linear reconstruction helps}
+Instead of treating every cell as having a constant state, the piecewise-linear method (PLM) reconstructs a linear profile within each cell:
 \begin{equation}
 q(x) \approx q_i + \sigma_i (x-x_i),
+\label{eq:m2-plm}
 \end{equation}
-where $\sigma_i$ is the slope in cell $i$.
+where $q_i$ is the cell average and $\sigma_i$ is a slope estimate. The reconstructed left and right interface states are
+\begin{equation}
+q_{i+1/2}^{L}=q_i+\frac12 \sigma_i \Delta x,
+\qquad
+q_{i+1/2}^{R}=q_{i+1}-\frac12 \sigma_{i+1}\Delta x.
+\label{eq:m2-plm-interfaces}
+\end{equation}
+This makes the interface data much more faithful to a smooth sinusoidal field.
 
-This allows left and right interface states to be reconstructed as
+\subsection{Why a limiter is still necessary}
+If the slopes are taken naively, oscillations can appear near sharp gradients. The minmod limiter suppresses that by selecting the smaller of the forward and backward slopes when they have the same sign, and setting the slope to zero when they do not:
 \begin{equation}
-q_{i+1/2}^{L} = q_i + \frac{1}{2}\sigma_i,
-\end{equation}
-\begin{equation}
-q_{i+1/2}^{R} = q_{i+1} - \frac{1}{2}\sigma_{i+1}.
-\end{equation}
-If the raw slope is too steep near a sharp gradient, spurious oscillations can appear. That is why a limiter is needed.
-
-\subsection{Why the minmod limiter is used}
-The minmod limiter compares the backward and forward differences and keeps the smaller one only when they have the same sign. If the signs disagree, the slope is set to zero. Symbolically,
-\begin{equation}
-\mathrm{minmod}(a,b) = \begin{cases}
-\mathrm{sign}(a)\min(|a|,|b|), & ab>0,\\
+\operatorname{minmod}(a,b)
+=
+\begin{cases}
+\operatorname{sign}(a)\min(|a|,|b|), & ab>0,\\
 0, & ab\le 0.
 \end{cases}
+\label{eq:m2-minmod}
 \end{equation}
-This means the scheme becomes cautious near a local extremum or near a steep gradient, which suppresses oscillations while still improving accuracy in smooth regions.
+So the method becomes second-order accurate in smooth regions but retreats toward first order in dangerous regions.
 
-\subsection{Second-order Runge-Kutta time stepping}
-The time integrator is also upgraded. Instead of taking one explicit Euler step, the second-order Runge-Kutta method uses two stages:
+\subsection{Why Runge--Kutta 2 is paired with PLM}
+The spatial approximation alone is not the whole story. If the time update remains only first-order accurate, some of the benefit of the improved spatial reconstruction is lost. The two-stage Runge--Kutta method therefore updates the state via
 \begin{equation}
-\mathbf{U}^{(1)} = \mathbf{U}^n + \Delta t \, \mathcal{L}(\mathbf{U}^n),
+\Uvec^{(1)} = \Uvec^n + \Delta t\,\mathcal{L}(\Uvec^n),
 \end{equation}
 \begin{equation}
-\mathbf{U}^{n+1} = \frac{1}{2}\left[\mathbf{U}^n + \mathbf{U}^{(1)} + \Delta t \, \mathcal{L}(\mathbf{U}^{(1)})\right],
+\Uvec^{n+1}
+=
+\frac12
+\left[
+\Uvec^n
++
+\Uvec^{(1)}
++
+\Delta t\,\mathcal{L}(\Uvec^{(1)})
+\right],
+\label{eq:m2-rk2}
 \end{equation}
-where $\mathcal{L}$ denotes the discrete spatial operator. The physical effect is not that the plasma behaves differently, but that the numerical approximation follows the continuous time evolution more faithfully.
+where $\mathcal{L}$ is the finite-volume spatial operator. The physical solution is unchanged; what improves is the fidelity with which the numerical method follows the continuous evolution.
 
-\section{Why the magnetic-pressure pulse is the nonlinear demonstration case}
+\section{The magnetic-pressure pulse as a nonlinear demonstration}
 
-\subsection{Physical meaning of magnetic pressure}
-In normalized ideal MHD units, the magnetic energy density and magnetic-pressure contribution scale like
+\subsection{Why magnetic pressure can launch motion}
+From Module~1, the magnetic force can be written as
 \begin{equation}
-p_{\mathrm{mag}} \sim \frac{1}{2}|\mathbf{B}|^2.
+\mathbf{f}_B
+=
+-\nabla\left(\frac{B^2}{2}\right)
++
+(\Bvec\cdot\nabla)\Bvec.
 \end{equation}
-If a localized region has a stronger magnetic field than its surroundings, then it also has a larger magnetic pressure. That overpressured region pushes on the surrounding plasma and launches nonlinear motion.
+The first term behaves like a pressure gradient built from magnetic energy density. Therefore, if one region has a larger $B^2$ than its surroundings, that region is \emph{magnetically overpressured} and pushes outward on the surrounding fluid.
 
-\subsection{Gaussian magnetic pulse}
-A simple way to create such an overpressured region is to initialize a localized out-of-plane magnetic perturbation:
+\subsection{How the pulse is initialized}
+The demonstration case introduces a localized out-of-plane magnetic perturbation:
 \begin{equation}
-B_z(x,y,0) = A \exp\left[-\frac{(x-x_0)^2 + (y-y_0)^2}{2\sigma^2}\right].
+B_z(x,y,0)
+=
+A\exp\left[
+-\frac{(x-x_0)^2+(y-y_0)^2}{2\sigma^2}
+\right].
+\label{eq:m2-gaussian}
 \end{equation}
-The background density, gas pressure, and in-plane magnetic field are taken uniform, while the localized $B_z$ enhancement changes the magnetic energy density near the pulse center.
+The density, thermal pressure, and in-plane magnetic field are otherwise taken uniform. The Gaussian profile means the field is strongest near $(x_0,y_0)$ and decreases smoothly away from the center.
+
+\subsection{Why this creates a magnetic-pressure gradient}
+Because $B_z$ is largest at the pulse center, the magnetic energy density
+\begin{equation}
+e_{\mathrm{mag}} = \frac12 |\Bvec|^2
+\end{equation}
+is also largest there. Therefore the magnetic-pressure contribution
+\begin{equation}
+p_{\mathrm{mag}}=\frac12 |\Bvec|^2
+\end{equation}
+has a spatial gradient pointing outward from the pulse center. The force density contribution
+\begin{equation}
+-\nabla p_{\mathrm{mag}}
+\end{equation}
+therefore pushes fluid away from the region of strongest field.
+
+\subsection{Why the pulse is nonlinear}
+Unlike the Alfv\'en verification problem, the Gaussian magnetic-pressure pulse is not just a translated copy of itself. As it evolves,
+\begin{itemize}[leftmargin=1.8em]
+    \item the field redistributes,
+    \item velocity develops in multiple directions,
+    \item density and gas pressure can change,
+    \item nonlinear couplings between field and flow become important.
+\end{itemize}
+So this case asks the solver to do more than follow a single linear wave family. It asks the solver to handle a genuinely two-dimensional MHD response.
 
 \begin{physicsbox}
-\textbf{Interpretation.} The pulse is not mainly for analytic verification. It is used to show that the solver can handle a nonlinear two-dimensional evolution in which a local magnetic overpressure drives fluid motion, redistributes field energy, and produces a visually interpretable dynamical response.
+\textbf{Interpretation.} The pulse is not mainly about having an exact formula. It is about checking whether the code can produce a physically interpretable nonlinear MHD evolution without obvious pathologies such as exploding divergence error, negative pressure, or wildly asymmetric artifacts unrelated to the problem setup.
 \end{physicsbox}
 
-\subsection{Why the diagnostics are different here}
-Unlike the Alfv\'en-wave case, the magnetic-pressure pulse does not have a simple exact analytical solution for direct pointwise comparison. So the emphasis shifts toward physically meaningful diagnostics:
-\begin{itemize}[leftmargin=1.8em]
-    \item total mass conservation,
-    \item total energy evolution,
-    \item the maximum value of $|\nabla\cdot\mathbf{B}|$,
-    \item field maps of density, pressure, magnetic magnitude, and velocity magnitude.
-\end{itemize}
-These diagnostics are appropriate because the case is intended as a nonlinear demonstration rather than a clean linear benchmark.
-
-\section{Why the divergence diagnostic must remain part of the workflow}
-The magnetic field should satisfy
-\begin{equation}
-\nabla\cdot\mathbf{B} = 0.
-\end{equation}
-In a discrete numerical solver, that constraint is never maintained exactly unless a special method enforces it. Even before such a method is added, monitoring $\nabla\cdot\mathbf{B}$ is essential because large divergence errors can create unphysical forces. The divergence diagnostic therefore acts as a structural quality check on every verification and demonstration run.
-
-\section{What these two cases accomplish together}
-The Alfv\'en wave and the magnetic-pressure pulse play complementary roles:
+\subsection{Why the diagnostics change for this case}
+Since there is no simple pointwise exact solution, the diagnostic focus changes:
 \begin{enumerate}[leftmargin=1.8em]
-    \item The Alfv\'en wave checks whether the solver reproduces a known linear MHD propagation problem with the correct characteristic speed.
-    \item The magnetic-pressure pulse shows that the same solver can produce a nonlinear, spatially two-dimensional evolution with interpretable field structure.
+    \item monitor total mass conservation,
+    \item monitor total-energy behavior,
+    \item monitor $\max |\nabla\cdot\Bvec|$,
+    \item inspect maps of density, pressure, velocity magnitude, and magnetic-field magnitude.
 \end{enumerate}
-Together they form a strong foundation for the later physics-informed neural network stage. The neural network can be compared against a solver that has already been tested on both a verification problem and a nonlinear demonstration problem.
+These diagnostics do not prove exact correctness the way the Alfv\'en benchmark does, but they do check whether the nonlinear evolution remains physically credible.
+
+\section{Why magnetic divergence must remain part of the workflow}
+Both benchmark problems must satisfy
+\begin{equation}
+\nabla\cdot\Bvec = 0.
+\label{eq:m2-divb}
+\end{equation}
+Even if the solver does not yet enforce this constraint exactly with a specialized method such as constrained transport, it must still monitor the quantity. Large divergence error can feed back into the momentum equation and create unphysical forces. That is why the divergence diagnostic is not optional bookkeeping; it is part of the physics validation logic.
+
+\section{What Module 2 accomplishes}
+After Module~1 introduces the governing equations, Module~2 turns them into a testing strategy:
+\begin{itemize}[leftmargin=1.8em]
+    \item the Alfv\'en wave checks whether the solver reproduces a known MHD propagation problem with the correct speed and low numerical error,
+    \item the magnetic-pressure pulse checks whether the same solver can evolve a nonlinear and spatially two-dimensional magnetic overpressure problem in a believable way,
+    \item the second-order upgrade is motivated by the need to capture the smooth benchmark more faithfully while keeping the method robust near stronger gradients.
+\end{itemize}
+These ideas form the bridge between the basic equations and the more advanced numerical and PINN modules that follow.
 
 \end{document}
