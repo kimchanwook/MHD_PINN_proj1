@@ -1,6 +1,6 @@
 # Physics-Informed Neural Network for Two-Dimensional MHD Evolution
 
-This repository contains the early-stage MATLAB implementation of a two-dimensional ideal magnetohydrodynamics (MHD) solver that will serve as the conventional solver backbone before adding a physics-informed neural network (PINN).
+This repository contains the early-stage MATLAB implementation of a two-dimensional ideal magnetohydrodynamics (MHD) solver that will serve as the conventional solver backbone before adding a physics-informed neural network (PINN). `This work was conducted with the assistance of a large language model (LLM), specifically ChatGPT`.
 
 ## Current contents
 - Primitive/conserved variable conversion
